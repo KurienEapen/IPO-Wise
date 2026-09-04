@@ -11,7 +11,7 @@ header = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
                   "Chrome/111.0.0.0 Safari/537.36",
     "Sec-Fetch-User": "?1", "Accept": "*/*", "Sec-Fetch-Site": "none", "Sec-Fetch-Mode": "navigate",
-    "Accept-Encoding": "gzip, deflate, br", "Accept-Language": "en-US,en;q=0.9,hi;q=0.8"
+    "Accept-Language": "en-US,en;q=0.9,hi;q=0.8"
     }
 
 def html_to_json(html_content):
@@ -48,11 +48,9 @@ def get_api_data(url):
         return None
 
 
-
-
-
 url = "https://www.5paisa.com/ipo-subscription-status/ipo"
 response = get_api_data(url)
-res = html_to_json(response.text)
-print(res)
+if response:
+    res = html_to_json(response.text)
+    print(res)
 

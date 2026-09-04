@@ -1,0 +1,17 @@
+[Unit]
+Description=IPO Wise Telegram Alert Bot & Web Console
+After=network.target
+
+[Service]
+Type=simple
+User=kurieneapen
+WorkingDirectory=/opt/ipo-alert-bot
+ExecStart=/usr/bin/python3 /opt/ipo-alert-bot/main.py
+Restart=always
+RestartSec=10
+Environment=PYTHONUNBUFFERED=1
+Environment=PORT=8080
+Environment=HOST=0.0.0.0
+
+[Install]
+WantedBy=multi-user.target

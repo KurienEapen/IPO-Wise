@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IPO Wise — Smart IPO Telegram Alert Bot</title>
+  <meta name="description" content="Intelligent monitoring for Indian IPOs with real-time GMP, subscription tracking, and automated Telegram alerts.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ base_path }}/static/style.css?v=2.4">
+  <script>window.BASE_PATH = "{{ base_path }}";</script>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div class="brand-wrapper">
+        <div class="brand-logo">📈</div>
+        <div class="brand-title">
+          <h1>IPO Wise <span style="font-size: 13px; font-weight: 500; color: var(--cyan); background: rgba(6,182,212,0.15); padding: 2px 8px; border-radius: 6px;">v2.0 Cloud</span></h1>
+          <p>Real-time IPO tracking & automated high-GMP Telegram notifications</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <!-- Navigation Links -->
+        <nav class="header-nav">
+          <a href="{{ base_path }}/" class="nav-link active">📈 Live Market</a>
+          <a href="{{ base_path }}/settings" class="nav-link">⚙️ Bot Settings</a>
+        </nav>
+
+        <button type="button" class="btn btn-emerald" style="padding: 6px 14px; font-size: 13px;" onclick="runCheckNow()" title="Run immediate check and dispatch alerts">
+          ⚡ Check Now
+        </button>
+
+        <div id="master-status-pill" class="status-pill active">
+          <span class="status-dot"></span>
+          <span id="master-status-text">Bot Active</span>
+        </div>
+        <a href="{{ base_path }}/logout" class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px; text-decoration: none;" title="Sign out of console">
+          🔒 Logout
+        </a>
+      </div>
+    </header>
+
+    <!-- Quick Stats Grid -->
+    <section class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">🟢</div>
+        <div class="stat-info">
+          <h3>Open IPOs</h3>
+          <p id="stat-open-count">--</p>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;">🔥</div>
+        <div class="stat-info">
+          <h3>Above Threshold</h3>
+          <p id="stat-high-gmp-count">--</p>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(99, 102, 241, 0.15); color: #818cf8;">🔕</div>
+        <div class="stat-info">
+          <h3>Muted / Applied</h3>
+          <p id="stat-muted-count">--</p>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(6, 182, 212, 0.15); color: #22d3ee;">⏰</div>
+        <div class="stat-info">
+          <h3>Scheduled Checks</h3>
+          <p id="stat-schedule-text">3x Daily</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Main Dashboard Full Width -->
+    <main class="dashboard-full">
+      <!-- Full Width Data Explorer & Tabs -->
+      <section class="glass-panel">
+        <div class="panel-header">
+          <div class="tabs-bar">
+            <button class="tab-btn active" onclick="switchTab('market')">📊 Live Market</button>
+            <button class="tab-btn" onclick="switchTab('muted')">🔕 Muted (<span id="muted-tab-count">0</span>)</button>
+            <button class="tab-btn" onclick="switchTab('logs')">📜 Logs</button>
+          </div>
+          <button class="btn btn-secondary btn-refresh" onclick="refreshCurrentTab()" title="Refresh live market data">
+            🔄 Refresh
+          </button>
+        </div>
+
+        <!-- TAB 1: Live Market Explorer -->
+        <div id="tab-market" class="tab-content">
+          <div class="filter-controls-header">
+            <div class="filter-pills-bar">
+              <button id="filter-btn-all" class="filter-btn" onclick="setTableFilter('all')">
+                Show All <span class="filter-count" id="count-all">0</span>
+              </button>
+              <button id="filter-btn-open" class="filter-btn active" onclick="setTableFilter('open')">
+                🟢 Open <span class="filter-count" id="count-open">0</span>
+              </button>
+              <button id="filter-btn-main" class="filter-btn" onclick="setTableFilter('mainboard')">
+                🏢 Main <span class="filter-count" id="count-main">0</span>
+              </button>
+              <button id="filter-btn-sme" class="filter-btn" onclick="setTableFilter('sme')">
+                ⚡ SME <span class="filter-count" id="count-sme">0</span>
+              </button>
+              <button id="filter-btn-high-gmp" class="filter-btn" onclick="setTableFilter('high-gmp')">
+                🔥 High GMP <span class="filter-count" id="count-high-gmp">0</span>
+              </button>
+            </div>
+            <div class="filter-controls-extra">
+              <button type="button" id="btn-hide-closed" class="filter-toggle-btn" onclick="toggleHideClosed()" title="Click to hide or show Closed and Past Listed IPOs">
+                <span id="hide-closed-icon">👁️</span>
+                <span id="hide-closed-text">Hide Closed / Listed Past</span>
+                <span id="hide-closed-count" class="filter-count">0</span>
+              </button>
+              <div style="font-size: 11.5px; color: var(--text-dim);" id="market-update-stamp">
+                Live InvestorGain v2 Feed
+              </div>
+            </div>
+          </div>
+
+          <!-- Active Filter & Sort Breadcrumb -->
+          <div class="filter-breadcrumb-bar">
+            <div id="filter-feedback-text">
+              Showing <b>0</b> IPOs
+            </div>
+            <div style="font-size: 11px; color: var(--text-dim);">
+              Click table headers to sort (A-Z, GMP %, Demand, etc.)
+            </div>
+          </div>
+
+          <!-- Mobile Sort Control (Visible on Mobile) -->
+          <div class="mobile-sort-bar">
+            <div class="mobile-sort-label">Sort by:</div>
+            <select id="mobile-sort-select" class="mobile-sort-select" onchange="handleMobileSortChange(this.value)">
+              <option value="gmp_desc">🔥 GMP % (Highest First)</option>
+              <option value="gmp_asc">📉 GMP % (Lowest First)</option>
+              <option value="end_date_asc">⏳ Closing Soon (End Date)</option>
+              <option value="start_date_desc">📅 Start Date (Newest First)</option>
+              <option value="demand_desc">📊 Demand (Highest Subscription)</option>
+              <option value="name_asc">🔤 IPO Name (A - Z)</option>
+              <option value="order_asc">💰 Min Investment (Lowest First)</option>
+            </select>
+          </div>
+
+          <!-- Desktop Table View -->
+          <div class="table-wrap desktop-table-wrap">
+            <table id="ipos-table">
+              <thead>
+                <tr>
+                  <th class="sortable" id="th-name" onclick="handleSort('name')">
+                    IPO Name <span class="sort-icon" id="sort-icon-name">↕</span>
+                  </th>
+                  <th class="sortable" id="th-start-date" onclick="handleSort('start_date')">
+                    Start Date <span class="sort-icon" id="sort-icon-start-date">↕</span>
+                  </th>
+                  <th class="sortable" id="th-end-date" onclick="handleSort('end_date')">
+                    End Date <span class="sort-icon" id="sort-icon-end-date">↕</span>
+                  </th>
+                  <th class="sortable" id="th-gmp" onclick="handleSort('gmp')">
+                    GMP (%) <span class="sort-icon" id="sort-icon-gmp">↕</span>
+                  </th>
+                  <th class="sortable" id="th-demand" onclick="handleSort('demand')">
+                    Sub Demand <span class="sort-icon" id="sort-icon-demand">↕</span>
+                  </th>
+                  <th class="sortable" id="th-order" onclick="handleSort('order')">
+                    Min Order / Price <span class="sort-icon" id="sort-icon-order">↕</span>
+                  </th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="ipos-table-body">
+                <tr>
+                  <td colspan="7" class="empty-state">Loading live IPO data...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Mobile Responsive Cards View -->
+          <div id="ipos-cards-container" class="mobile-cards-wrap">
+            <div class="empty-state">Loading live IPO data...</div>
+          </div>
+        </div>
+
+        <!-- TAB 2: Muted IPOs -->
+        <div id="tab-muted" class="tab-content" style="display: none;">
+          <div style="display: flex; gap: 10px; margin-bottom: 16px;">
+            <div class="input-container" style="flex: 1;">
+              <span class="input-icon">➕</span>
+              <input type="text" id="manual-mute-name" class="custom-input" placeholder="Manually mute an IPO name...">
+            </div>
+            <button class="btn btn-secondary" onclick="manualMute()">Mute IPO</button>
+          </div>
+
+          <div class="table-wrap desktop-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Muted IPO Name</th>
+                  <th>Type</th>
+                  <th>Muted At</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="muted-table-body">
+                <tr>
+                  <td colspan="4" class="empty-state">No IPOs currently muted</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Mobile Cards for Muted Tab -->
+          <div id="muted-cards-container" class="mobile-cards-wrap">
+            <div class="empty-state">No IPOs currently muted</div>
+          </div>
+        </div>
+
+        <!-- TAB 3: Alert Dispatch Logs -->
+        <div id="tab-logs" class="tab-content" style="display: none;">
+          <div class="table-wrap desktop-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Sent At</th>
+                  <th>IPO Name</th>
+                  <th>GMP</th>
+                  <th>Demand</th>
+                  <th>Status</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody id="logs-table-body">
+                <tr>
+                  <td colspan="6" class="empty-state">No alert history recorded yet</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Mobile Cards for Logs Tab -->
+          <div id="logs-cards-container" class="mobile-cards-wrap">
+            <div class="empty-state">No alert history recorded yet</div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Reminder Modal -->
+  <div id="reminder-modal" class="modal-backdrop" style="display: none;" onclick="if(event.target===this) closeReminderModal()">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div style="font-size: 24px;">⏰</div>
+        <div>
+          <h3 id="remind-modal-title">Closing Day Reminder</h3>
+          <p id="remind-modal-subtitle" style="font-size: 12px; color: var(--text-muted);"></p>
+        </div>
+        <button type="button" class="modal-close" onclick="closeReminderModal()">&times;</button>
+      </div>
+      
+      <div class="modal-body">
+        <div class="remind-info-box">
+          <div class="remind-info-row">
+            <span>📅 Closing Date:</span> <b id="remind-modal-date">-</b>
+          </div>
+          <div class="remind-info-row">
+            <span>⏰ Reminder Alarm:</span> <b>10:00 AM IST (Day of Closing)</b>
+          </div>
+          <div class="remind-info-row">
+            <span>📈 Est. GMP:</span> <b id="remind-modal-gmp">-</b>
+          </div>
+          <div class="remind-info-row">
+            <span>⏳ Bidding Cutoff:</span> <b style="color: #f87171;">Bidding closes at 5:00 PM IST</b>
+          </div>
+        </div>
+
+        <div class="remind-options-list">
+          <button type="button" class="btn-remind-option" onclick="triggerGoogleCalendar()">
+            <span class="option-icon">📅</span>
+            <div class="option-text">
+              <b>Google Calendar</b>
+              <span>Opens in Google Calendar app or web with pre-filled alarm</span>
+            </div>
+          </button>
+
+          <button type="button" class="btn-remind-option" onclick="triggerIcsCalendar()">
+            <span class="option-icon">🍏</span>
+            <div class="option-text">
+              <b>Apple / Phone Calendar (.ics)</b>
+              <span>1-tap add to iPhone/Mac Calendar or Outlook with notification</span>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container"></div>
+
+  <script src="{{ base_path }}/static/app.js?v=2.4"></script>
+</body>
+</html>

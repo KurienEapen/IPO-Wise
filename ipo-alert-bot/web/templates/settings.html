@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bot Configuration — IPO Wise</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ base_path }}/static/style.css">
+  <script>window.BASE_PATH = "{{ base_path }}";</script>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div class="brand-wrapper">
+        <div class="brand-logo">⚙️</div>
+        <div class="brand-title">
+          <h1>IPO Wise <span style="font-size: 13px; font-weight: 500; color: var(--cyan); background: rgba(6,182,212,0.15); padding: 2px 8px; border-radius: 6px;">Settings</span></h1>
+          <p>Configure Telegram credentials, GMP rules, schedules &amp; security</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <!-- Navigation Links -->
+        <nav class="header-nav">
+          <a href="{{ base_path }}/" class="nav-link">📈 Live Market</a>
+          <a href="{{ base_path }}/settings" class="nav-link active">⚙️ Bot Settings</a>
+        </nav>
+
+        <div id="master-status-pill" class="status-pill active">
+          <span class="status-dot"></span>
+          <span id="master-status-text">Bot Active</span>
+        </div>
+
+        <a href="{{ base_path }}/logout" class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px; text-decoration: none;" title="Sign out of console">
+          🔒 Logout
+        </a>
+      </div>
+    </header>
+
+    <form id="settings-form" onsubmit="event.preventDefault(); saveSettings();">
+      <!-- 4-Card Settings Grid -->
+      <main class="settings-grid">
+        
+        <!-- CARD 1: Bot Controls & Threshold Rules -->
+        <div class="glass-panel">
+          <div class="panel-header">
+            <h2 class="panel-title">🤖 Bot Controls &amp; Rules</h2>
+          </div>
+
+          <!-- Master Switch -->
+          <div class="switch-group">
+            <div>
+              <div style="font-weight: 600; font-size: 13.5px;">Master Bot Status</div>
+              <div class="helper-text">Globally enable or pause automated alert dispatches</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="input-is-enabled" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <!-- SME Switch -->
+          <div class="switch-group">
+            <div>
+              <div style="font-weight: 600; font-size: 13.5px;">SME IPO Alerts</div>
+              <div class="helper-text">Enable notifications for SME segment IPOs</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="input-enable-sme" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <!-- GMP Alert Threshold Slider -->
+          <div class="form-group" style="margin-top: 14px;">
+            <label for="input-gmp-threshold">GMP Alert Threshold (%)</label>
+            <div class="range-slider-wrap">
+              <input type="range" id="input-gmp-threshold" class="range-slider" min="0" max="60" step="1" value="15" oninput="updateGmpDisplay(this.value)">
+              <span id="gmp-display-val" class="range-val">&gt; 15%</span>
+            </div>
+            <div class="helper-text">Only open IPOs with GMP % at or above this threshold will trigger alerts</div>
+          </div>
+        </div>
+
+        <!-- CARD 2: Telegram Credentials -->
+        <div class="glass-panel">
+          <div class="panel-header">
+            <h2 class="panel-title">📱 Telegram Integration</h2>
+          </div>
+
+          <div class="form-group">
+            <label for="input-bot-token">Telegram Bot Token</label>
+            <div class="input-container">
+              <span class="input-icon">🔑</span>
+              <input type="password" id="input-bot-token" class="custom-input" placeholder="e.g. 123456789:ABCdefGhI..." autocomplete="off">
+            </div>
+            <div class="helper-text">Obtained via @BotFather on Telegram</div>
+          </div>
+
+          <div class="form-group">
+            <label for="input-chat-id">Target Chat / Channel / Group ID</label>
+            <div class="input-container">
+              <span class="input-icon">📢</span>
+              <input type="text" id="input-chat-id" class="custom-input" placeholder="e.g. @MyChannel, -1001234567890, or 12345678">
+            </div>
+            <div class="helper-text">Use negative ID for groups/channels, or username (@channel)</div>
+          </div>
+
+          <div style="margin-top: 18px;">
+            <button type="button" class="btn btn-secondary btn-block" onclick="testTelegramConnection()">
+              📡 Test Telegram Connection
+            </button>
+          </div>
+        </div>
+
+        <!-- CARD 3: Schedule & Automated Checks -->
+        <div class="glass-panel">
+          <div class="panel-header">
+            <h2 class="panel-title">🕒 Schedule &amp; Execution</h2>
+          </div>
+
+          <div class="form-group">
+            <label for="input-schedule-times">Daily Check Times (IST / 24-hour)</label>
+            <div class="input-container">
+              <span class="input-icon">🕒</span>
+              <input type="text" id="input-schedule-times" class="custom-input" value="10:00,12:30,15:30" placeholder="10:00,12:30,15:30">
+            </div>
+            <div class="helper-text">Default times align with Indian market open, midday, and close</div>
+          </div>
+
+          <div class="form-group">
+            <label for="input-timezone">Timezone</label>
+            <div class="input-container">
+              <span class="input-icon">🌐</span>
+              <input type="text" id="input-timezone" class="custom-input" value="Asia/Kolkata" readonly style="opacity: 0.8;">
+            </div>
+            <div class="helper-text">Times run in Indian Standard Time (IST)</div>
+          </div>
+
+          <div style="padding: 12px; background: rgba(13, 19, 32, 0.5); border-radius: var(--radius-md); border: 1px solid var(--border-subtle); margin-top: 16px;">
+            <div style="font-size: 11.5px; color: var(--text-dim); display: flex; justify-content: space-between;">
+              <span>Last Execution:</span>
+              <span id="last-check-status-label" style="color: var(--cyan); font-weight: 600;">Idle</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- CARD 4: Admin Security -->
+        <div class="glass-panel">
+          <div class="panel-header">
+            <h2 class="panel-title">🔐 Admin Console Security</h2>
+          </div>
+
+          <p style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 14px;">
+            Update the master password required to access this Web Management Console.
+          </p>
+
+          <div class="form-group">
+            <label for="input-curr-pw">Current Password</label>
+            <div class="input-container">
+              <span class="input-icon">🔒</span>
+              <input type="password" id="input-curr-pw" class="custom-input" placeholder="Current admin password">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="input-new-pw">New Password</label>
+            <div class="input-container">
+              <span class="input-icon">✨</span>
+              <input type="password" id="input-new-pw" class="custom-input" placeholder="New password (min 4 chars)">
+            </div>
+          </div>
+
+          <button type="button" class="btn btn-secondary btn-block" onclick="changeAdminPassword()">
+            Update Password
+          </button>
+        </div>
+
+      </main>
+
+      <!-- Bottom Action Bar -->
+      <div class="settings-actions-bar">
+        <button type="button" class="btn btn-emerald" onclick="runCheckNow()">
+          ⚡ Run Check Now
+        </button>
+        <button type="submit" class="btn btn-primary">
+          💾 Save All Settings
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <script src="{{ base_path }}/static/settings.js"></script>
+</body>
+</html>

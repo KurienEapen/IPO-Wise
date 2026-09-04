@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — IPO Wise Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ base_path }}/static/style.css">
+  <script>window.BASE_PATH = "{{ base_path }}";</script>
+  <style>
+    .login-container {
+      min-height: 85vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .login-card {
+      width: 100%;
+      max-width: 420px;
+      background: var(--bg-card);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 36px 32px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+      text-align: center;
+    }
+    .login-logo {
+      width: 58px;
+      height: 58px;
+      background: linear-gradient(135deg, #6366f1, #06b6d4);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 30px;
+      margin: 0 auto 20px auto;
+      box-shadow: 0 8px 30px var(--primary-glow);
+    }
+    @media (max-width: 480px) {
+      .login-container {
+        min-height: 80vh;
+        padding: 16px 8px;
+      }
+      .login-card {
+        padding: 28px 18px;
+        border-radius: var(--radius-md);
+      }
+      .login-card input {
+        font-size: 16px !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-card">
+      <div class="login-logo">🔒</div>
+      <h1 style="font-family: var(--font-heading); font-size: 24px; font-weight: 700; margin-bottom: 6px;">IPO Wise Console</h1>
+      <p style="font-size: 13.5px; color: var(--text-muted); margin-bottom: 28px;">
+        This console is protected. Please enter the master admin password to continue.
+      </p>
+
+      <form id="login-form" onsubmit="event.preventDefault(); submitLogin();">
+        <div class="form-group" style="text-align: left;">
+          <label for="admin-password">Admin Password</label>
+          <div class="input-container">
+            <span class="input-icon">🔑</span>
+            <input type="password" id="admin-password" class="custom-input" placeholder="Enter password..." required autofocus>
+          </div>
+        </div>
+
+        <button type="submit" id="btn-login" class="btn btn-primary btn-block" style="padding: 12px; margin-top: 10px;">
+          🔓 Unlock Console
+        </button>
+      </form>
+
+      <div style="margin-top: 24px; font-size: 11.5px; color: var(--text-dim);">
+        Protected by session authentication
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <script>
+    function showToast(message, type = 'error') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.innerHTML = `<span>${type === 'success' ? '✅' : '❌'}</span> <span>${message}</span>`;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
+
+    async function submitLogin() {
+      const input = document.getElementById('admin-password');
+      const btn = document.getElementById('btn-login');
+      const pw = input.value.trim();
+      if (!pw) return;
+
+      btn.disabled = true;
+      btn.innerText = 'Verifying...';
+
+      try {
+        const basePath = window.BASE_PATH || '';
+        const res = await fetch(`${basePath}/api/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: pw })
+        });
+        const data = await res.json();
+        if (res.ok && data.status === 'success') {
+          showToast('Authenticated! Redirecting...', 'success');
+          setTimeout(() => {
+            window.location.href = basePath ? `${basePath}/` : '/';
+          }, 400);
+        } else {
+          showToast(data.detail || 'Incorrect password', 'error');
+          input.value = '';
+          input.focus();
+        }
+      } catch (err) {
+        showToast('Connection error', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerText = '🔓 Unlock Console';
+      }
+    }
+  </script>
+</body>
+</html>
