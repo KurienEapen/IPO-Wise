@@ -23,6 +23,58 @@ function updateGmpDisplay(val) {
   document.getElementById('gmp-display-val').innerText = `> ${val}%`;
 }
 
+function calculateNextRunFallback(timesStr) {
+  if (!timesStr) return null;
+  const times = timesStr.split(',').map(t => t.trim()).filter(Boolean);
+  if (times.length === 0) return null;
+
+  // Calculate in IST (UTC+5.5)
+  const now = new Date();
+  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+  const istNow = new Date(utc + (3600000 * 5.5));
+  const currentMinutes = istNow.getHours() * 60 + istNow.getMinutes();
+
+  let nextTodayMin = null;
+  let nextTodayStr = null;
+  let earliestTomorrowMin = null;
+  let earliestTomorrowStr = null;
+
+  for (const t of times) {
+    let h = 0, m = 0;
+    const match12 = t.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/i);
+    if (match12) {
+      h = parseInt(match12[1], 10);
+      m = match12[2] ? parseInt(match12[2], 10) : 0;
+      if (match12[3].toLowerCase() === 'pm' && h !== 12) h += 12;
+      if (match12[3].toLowerCase() === 'am' && h === 12) h = 0;
+    } else {
+      const parts = t.split(':');
+      if (parts.length >= 2) {
+        h = parseInt(parts[0], 10);
+        m = parseInt(parts[1], 10);
+      }
+    }
+    const tMin = h * 60 + m;
+    if (tMin > currentMinutes) {
+      if (nextTodayMin === null || tMin < nextTodayMin) {
+        nextTodayMin = tMin;
+        nextTodayStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      }
+    }
+    if (earliestTomorrowMin === null || tMin < earliestTomorrowMin) {
+      earliestTomorrowMin = tMin;
+      earliestTomorrowStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    }
+  }
+
+  if (nextTodayStr) {
+    return `Today at ${nextTodayStr}`;
+  } else if (earliestTomorrowStr) {
+    return `Tomorrow at ${earliestTomorrowStr}`;
+  }
+  return null;
+}
+
 async function loadSettings() {
   try {
     const res = await fetch(`${BASE_PATH}/api/settings`);
@@ -45,27 +97,68 @@ async function loadSettings() {
     document.getElementById('input-gmp-threshold').value = thresh;
     updateGmpDisplay(thresh);
 
-    document.getElementById('input-schedule-times').value = currentSettings.schedule_times || '10:00,12:30,15:30';
+    const scheduleTimes = currentSettings.schedule_times || '10:00, 12:30, 15:30';
+    document.getElementById('input-schedule-times').value = scheduleTimes;
 
-    updateStatusUI(isEnabled, currentSettings.last_check_status);
+    // Direct schedule status fallback fetch if not in settings response
+    if (!currentSettings.schedule_info) {
+      try {
+        const schedRes = await fetch(`${BASE_PATH}/api/schedule-status`);
+        if (schedRes.ok) {
+          currentSettings.schedule_info = await schedRes.json();
+        }
+      } catch (e) {
+        console.warn('Direct schedule-status fetch error:', e);
+      }
+    }
+
+    updateStatusUI(isEnabled, currentSettings.last_check_status, currentSettings.last_check_at, currentSettings.schedule_info, scheduleTimes);
   } catch (err) {
     showToast('Failed to load settings', 'error');
   }
 }
 
-function updateStatusUI(isEnabled, lastStatus) {
+function updateStatusUI(isEnabled, lastStatus, lastCheckAt, scheduleInfo, scheduleTimesStr) {
   const pill = document.getElementById('master-status-pill');
   const text = document.getElementById('master-status-text');
-  if (isEnabled) {
-    pill.className = 'status-pill active';
-    text.innerText = 'Bot Active';
-  } else {
-    pill.className = 'status-pill paused';
-    text.innerText = 'Bot Paused';
+  if (pill && text) {
+    if (isEnabled) {
+      pill.className = 'status-pill active';
+      text.innerText = 'Bot Active';
+    } else {
+      pill.className = 'status-pill paused';
+      text.innerText = 'Bot Paused';
+    }
   }
 
-  if (lastStatus) {
-    document.getElementById('last-check-status-label').innerText = lastStatus;
+  const lastStatusLabel = document.getElementById('last-check-status-label');
+  if (lastStatusLabel) {
+    lastStatusLabel.innerText = lastStatus || 'Idle';
+  }
+
+  const lastAtLabel = document.getElementById('last-check-at-label');
+  if (lastAtLabel) {
+    lastAtLabel.innerText = lastCheckAt ? `${lastCheckAt} IST` : 'None';
+  }
+
+  const nextLabel = document.getElementById('next-check-time-label');
+  if (nextLabel) {
+    if (!isEnabled) {
+      nextLabel.innerText = 'Paused (Bot Paused)';
+      nextLabel.style.color = '#f59e0b';
+    } else if (scheduleInfo && scheduleInfo.next_fire_time) {
+      nextLabel.innerText = `${scheduleInfo.next_fire_time} IST`;
+      nextLabel.style.color = '#34d399';
+    } else {
+      const fallback = calculateNextRunFallback(scheduleTimesStr || currentSettings.schedule_times);
+      if (fallback) {
+        nextLabel.innerText = `${fallback} IST`;
+        nextLabel.style.color = '#34d399';
+      } else {
+        nextLabel.innerText = 'Active (Checking schedule...)';
+        nextLabel.style.color = '#34d399';
+      }
+    }
   }
 }
 
@@ -92,9 +185,9 @@ async function saveSettings() {
     });
     const data = await res.json();
     if (res.ok) {
-      showToast('Settings saved successfully', 'success');
+      showToast('Settings saved & schedule updated successfully', 'success');
       currentSettings = data.settings;
-      updateStatusUI(isEnabled === '1', currentSettings.last_check_status);
+      updateStatusUI(isEnabled === '1', currentSettings.last_check_status, currentSettings.last_check_at, currentSettings.schedule_info);
     } else {
       showToast(data.detail || 'Error saving settings', 'error');
     }

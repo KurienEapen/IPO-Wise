@@ -67,7 +67,11 @@ async function loadSettings() {
     const scheduleStat = document.getElementById('stat-schedule-text');
     if (scheduleStat && currentSettings.schedule_times) {
       const times = currentSettings.schedule_times.split(',').map(t => t.trim()).filter(Boolean);
+      const nextTime = currentSettings.schedule_info?.next_fire_time;
       scheduleStat.innerText = times.length > 0 ? `${times.length}x Daily` : 'Manual';
+      if (nextTime) {
+        scheduleStat.title = `Next scheduled check: ${nextTime} IST`;
+      }
     }
   } catch (err) {
     console.error('Failed to load settings', err);

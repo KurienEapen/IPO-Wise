@@ -134,7 +134,19 @@ async def get_all_settings():
     settings = get_settings()
     # Mask password hash for security
     sanitized = {k: v for k, v in settings.items() if k != "admin_password_hash"}
+    if scheduler_instance:
+        try:
+            sanitized["schedule_info"] = scheduler_instance.get_schedule_info()
+        except Exception as e:
+            sanitized["schedule_info"] = {"error": str(e)}
     return sanitized
+
+@app.get("/api/schedule-status", dependencies=[Depends(require_auth)])
+async def get_schedule_status():
+    global scheduler_instance
+    if not scheduler_instance:
+        return {"is_running": False, "jobs_count": 0, "jobs": [], "next_fire_time": None}
+    return scheduler_instance.get_schedule_info()
 
 @app.post("/api/settings", dependencies=[Depends(require_auth)])
 async def save_settings(data: Dict[str, Any] = Body(...)):
@@ -152,6 +164,11 @@ async def save_settings(data: Dict[str, Any] = Body(...)):
             print(f"Error reloading scheduler: {e}")
             
     sanitized = {k: v for k, v in get_settings().items() if k != "admin_password_hash"}
+    if scheduler_instance:
+        try:
+            sanitized["schedule_info"] = scheduler_instance.get_schedule_info()
+        except Exception:
+            pass
     return {"status": "success", "message": "Settings updated successfully", "settings": sanitized}
 
 @app.post("/api/change-password", dependencies=[Depends(require_auth)])

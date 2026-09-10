@@ -151,8 +151,8 @@ def get_muted_ipos() -> List[Dict[str, Any]]:
 
 def log_alert(ipo_name: str, gmp_val: str, gmp_percent: float, total_sub: str,
               retail_sub: str, hni_sub: str, qib_sub: str, chat_id: str,
-              status: str, details: str = ""):
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+              status: str, details: str = "", sent_at: Optional[str] = None):
+    now_str = sent_at or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""

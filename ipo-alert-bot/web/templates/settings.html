@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ base_path }}/static/style.css">
+  <link rel="stylesheet" href="{{ base_path }}/static/style.css?v=3.1">
   <script>window.BASE_PATH = "{{ base_path }}";</script>
 </head>
 <body>
@@ -126,9 +126,9 @@
             <label for="input-schedule-times">Daily Check Times (IST / 24-hour)</label>
             <div class="input-container">
               <span class="input-icon">🕒</span>
-              <input type="text" id="input-schedule-times" class="custom-input" value="10:00,12:30,15:30" placeholder="10:00,12:30,15:30">
+              <input type="text" id="input-schedule-times" class="custom-input" value="10:00,12:30,15:30" placeholder="10:00, 12:30, 15:30">
             </div>
-            <div class="helper-text">Default times align with Indian market open, midday, and close</div>
+            <div class="helper-text">Supports 24h format (e.g. <code>10:00, 12:30, 15:30</code>) or 12h AM/PM (e.g. <code>10:00 AM, 2:30 PM</code>)</div>
           </div>
 
           <div class="form-group">
@@ -137,13 +137,20 @@
               <span class="input-icon">🌐</span>
               <input type="text" id="input-timezone" class="custom-input" value="Asia/Kolkata" readonly style="opacity: 0.8;">
             </div>
-            <div class="helper-text">Times run in Indian Standard Time (IST)</div>
+            <div class="helper-text">Engine runs natively in Indian Standard Time (IST) with 1h misfire grace protection</div>
           </div>
 
-          <div style="padding: 12px; background: rgba(13, 19, 32, 0.5); border-radius: var(--radius-md); border: 1px solid var(--border-subtle); margin-top: 16px;">
-            <div style="font-size: 11.5px; color: var(--text-dim); display: flex; justify-content: space-between;">
-              <span>Last Execution:</span>
-              <span id="last-check-status-label" style="color: var(--cyan); font-weight: 600;">Idle</span>
+          <div style="padding: 12px; background: rgba(13, 19, 32, 0.5); border-radius: var(--radius-md); border: 1px solid var(--border-subtle); margin-top: 14px; display: flex; flex-direction: column; gap: 8px;">
+            <div style="font-size: 11.5px; color: var(--text-dim); display: flex; justify-content: space-between; align-items: center;">
+              <span>⏭️ Next Scheduled Run:</span>
+              <span id="next-check-time-label" style="color: #34d399; font-weight: 600;">Calculating...</span>
+            </div>
+            <div style="font-size: 11.5px; color: var(--text-dim); border-top: 1px solid rgba(255,255,255,0.06); padding-top: 8px;">
+              <div style="display: flex; justify-content: space-between;">
+                <span>⏮️ Last Execution:</span>
+                <span id="last-check-at-label" style="color: var(--text-muted); font-size: 11px;">--</span>
+              </div>
+              <div id="last-check-status-label" style="color: var(--cyan); font-weight: 600; font-size: 12px; margin-top: 3px; word-break: break-word;">Idle</div>
             </div>
           </div>
         </div>
@@ -195,6 +202,6 @@
 
   <div id="toast-container"></div>
 
-  <script src="{{ base_path }}/static/settings.js"></script>
+  <script src="{{ base_path }}/static/settings.js?v=3.1"></script>
 </body>
 </html>
