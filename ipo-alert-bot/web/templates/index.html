@@ -26,6 +26,7 @@
         <!-- Navigation Links -->
         <nav class="header-nav">
           <a href="{{ base_path }}/" class="nav-link active">📈 Live Market</a>
+          <a href="{{ base_path }}/subscribers" class="nav-link">👥 Subscribers</a>
           <a href="{{ base_path }}/settings" class="nav-link">⚙️ Bot Settings</a>
         </nav>
 
@@ -101,13 +102,13 @@
                   <button id="filter-btn-all" class="filter-btn" onclick="setStatusFilter('all')">
                     All <span class="filter-count" id="count-all">0</span>
                   </button>
-                  <button id="filter-btn-open" class="filter-btn active" onclick="setStatusFilter('open')">
+                  <button id="filter-btn-open" class="filter-btn" onclick="setStatusFilter('open')">
                     🟢 Open <span class="filter-count" id="count-open">0</span>
                   </button>
                   <button id="filter-btn-closing" class="filter-btn" onclick="setStatusFilter('closing')">
                     ⏳ Ending Today <span class="filter-count" id="count-closing">0</span>
                   </button>
-                  <button id="filter-btn-high-gmp" class="filter-btn" onclick="setStatusFilter('high-gmp')">
+                  <button id="filter-btn-high-gmp" class="filter-btn active" onclick="setStatusFilter('high-gmp')">
                     🔥 High GMP <span class="filter-count" id="count-high-gmp">0</span>
                   </button>
                 </div>
@@ -117,10 +118,10 @@
               <div class="filter-group">
                 <span class="filter-group-label">Board:</span>
                 <div class="filter-pills-bar filter-board-bar" id="board-pills-bar">
-                  <button id="filter-btn-board-all" class="filter-btn active" onclick="setBoardFilter('all')">
+                  <button id="filter-btn-board-all" class="filter-btn" onclick="setBoardFilter('all')">
                     All Boards <span class="filter-count" id="count-board-all">0</span>
                   </button>
-                  <button id="filter-btn-main" class="filter-btn" onclick="setBoardFilter('mainboard')">
+                  <button id="filter-btn-main" class="filter-btn active" onclick="setBoardFilter('mainboard')">
                     🏢 Mainboard <span class="filter-count" id="count-main">0</span>
                   </button>
                   <button id="filter-btn-sme" class="filter-btn" onclick="setBoardFilter('sme')">
@@ -323,6 +324,6 @@
   <!-- Toast Container -->
   <div id="toast-container"></div>
 
-  <script src="{{ base_path }}/static/app.js?v=3.2"></script>
+  <script src="{{ base_path }}/static/app.js?v=3.4"></script>
 </body>
 </html>

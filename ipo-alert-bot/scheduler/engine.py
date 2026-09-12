@@ -1,3 +1,4 @@
+import time
 import logging
 import re
 from datetime import datetime
@@ -6,7 +7,11 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from scraper.investorgain import InvestorGainScraper
 from bot.telegram_client import TelegramClient
-from database import is_ipo_muted, log_alert, update_settings
+from database import (
+    is_ipo_muted, log_alert, update_settings,
+    get_approved_subscribers, cleanup_closed_muted_ipos,
+    get_subscriber
+)
 from config import config
 
 logger = logging.getLogger("ipo_bot.scheduler")
@@ -157,6 +162,18 @@ class AlertScheduler:
 
         try:
             update_settings({"last_check_at": now_str, "last_check_status": "Checking live market..."})
+            
+            # 1. Clean up muted records for IPOs that have closed/no longer open
+            try:
+                all_scraped = self.scraper.parse_all_ipos()
+                currently_open_names = [x["name"] for x in all_scraped if x.get("is_open")]
+                cleaned = cleanup_closed_muted_ipos(currently_open_names)
+                if cleaned > 0:
+                    print(f"[AlertScheduler] Auto-cleaned {cleaned} muted record(s) for closed IPOs.")
+            except Exception as ce:
+                logger.warning(f"Auto-cleanup of closed IPOs encountered an issue: {ce}")
+
+            # 2. Scrape live open IPOs meeting the GMP threshold
             open_ipos = self.scraper.get_open_ipos_above_gmp(min_gmp)
             total_open = len(open_ipos)
             print(f"[AlertScheduler] Scraped market: Found {total_open} open IPO(s) with GMP >= {min_gmp}%.")
@@ -167,85 +184,168 @@ class AlertScheduler:
             sme_skipped_count = 0
             client = TelegramClient(token) if token else None
 
+            # Retrieve active approved private subscribers (if not targeting a single chat override)
+            approved_subs = get_approved_subscribers() if not target_chat_override else []
+
+            # Determine lowest threshold across system setting and approved subscribers
+            sub_thresholds = [float(s["gmp_threshold"]) for s in approved_subs if s.get("gmp_threshold") is not None]
+            scrape_threshold = min([min_gmp] + sub_thresholds) if sub_thresholds else min_gmp
+
+            # 2. Scrape live open IPOs meeting the lowest threshold
+            open_ipos = self.scraper.get_open_ipos_above_gmp(scrape_threshold)
+            total_open = len(open_ipos)
+            print(f"[AlertScheduler] Scraped market: Found {total_open} open IPO(s) with GMP >= {scrape_threshold}%.")
+            logger.info(f"Found {total_open} open IPO(s) with GMP >= {scrape_threshold}%.")
+            
+            alerts_dispatched = 0
+            muted_count = 0
+            sme_skipped_count = 0
+            client = TelegramClient(token) if token else None
+
             for ipo in open_ipos:
                 name = ipo["name"]
-                
-                # Check if muted
-                if is_ipo_muted(name):
-                    muted_count += 1
-                    print(f"[AlertScheduler] Skipping '{name}': Marked as Muted/Applied.")
-                    log_alert(
-                        ipo_name=name,
-                        gmp_val=ipo.get("gmp_val", ""),
-                        gmp_percent=ipo.get("gmp_percent", 0.0),
-                        total_sub=ipo.get("total_sub", ""),
-                        retail_sub=ipo.get("retail_sub", ""),
-                        hni_sub=ipo.get("hni_sub", ""),
-                        qib_sub=ipo.get("qib_sub", ""),
-                        chat_id=chat_id or "NONE",
-                        status="MUTED_SKIPPED",
-                        details="Ignored/Applied by user",
-                        sent_at=now_str
-                    )
-                    continue
+                gmp_pct = ipo.get("gmp_percent", 0.0)
+                category = str(ipo.get("category", "")).upper()
+                is_sme = (category == "SME")
 
-                # Check SME rule
-                category = ipo.get("category", "").upper()
-                if category == "SME" and not config.enable_sme_alerts:
-                    sme_skipped_count += 1
-                    print(f"[AlertScheduler] Skipping '{name}': SME IPO alerts are disabled by rule.")
-                    log_alert(
-                        ipo_name=name,
-                        gmp_val=ipo.get("gmp_val", ""),
-                        gmp_percent=ipo.get("gmp_percent", 0.0),
-                        total_sub=ipo.get("total_sub", ""),
-                        retail_sub=ipo.get("retail_sub", ""),
-                        hni_sub=ipo.get("hni_sub", ""),
-                        qib_sub=ipo.get("qib_sub", ""),
-                        chat_id=chat_id or "NONE",
-                        status="SME_SKIPPED",
-                        details="SME IPO alerts disabled by user rule",
-                        sent_at=now_str
-                    )
-                    continue
+                # Prepare formats:
+                # Group format: NO interactive buttons & no mute prompt footer
+                group_card_html, _ = TelegramClient.format_ipo_alert(ipo, include_buttons=False)
+                # Private DM format: WITH interactive Applied / Ignore buttons
+                dm_card_html, dm_markup = TelegramClient.format_ipo_alert(ipo, include_buttons=True)
 
-                card_html, markup = TelegramClient.format_ipo_alert(ipo)
-                
-                if client and chat_id:
-                    success, msg = client.send_message(chat_id=chat_id, text=card_html, reply_markup=markup)
-                    status_log = "SENT" if success else "FAILED"
-                    log_alert(
-                        ipo_name=name,
-                        gmp_val=ipo.get("gmp_val", ""),
-                        gmp_percent=ipo.get("gmp_percent", 0.0),
-                        total_sub=ipo.get("total_sub", ""),
-                        retail_sub=ipo.get("retail_sub", ""),
-                        hni_sub=ipo.get("hni_sub", ""),
-                        qib_sub=ipo.get("qib_sub", ""),
-                        chat_id=chat_id,
-                        status=status_log,
-                        details=msg,
-                        sent_at=now_str
-                    )
-                    if success:
+                if target_chat_override:
+                    # Targeted check (e.g. user ran /check or dashboard triggered check with override)
+                    is_group = str(target_chat_override).strip().startswith("-")
+                    target_sub = get_subscriber(target_chat_override) if not is_group else None
+
+                    # Category check: SME only allowed if opted-in
+                    if is_sme:
+                        if is_group and not config.enable_sme_alerts:
+                            continue
+                        if target_sub and not bool(target_sub.get("enable_sme", 0)):
+                            continue
+
+                    effective_thresh = float(target_sub["gmp_threshold"]) if (target_sub and target_sub.get("gmp_threshold") is not None) else min_gmp
+
+                    if gmp_pct < effective_thresh:
+                        continue
+
+                    user_muted = is_ipo_muted(name, chat_id=target_chat_override)
+                    if user_muted:
+                        muted_count += 1
+                        print(f"[AlertScheduler] Skipping '{name}' for '{target_chat_override}': Muted by user.")
+                        continue
+
+                    text_to_send = group_card_html if is_group else dm_card_html
+                    markup_to_send = None if is_group else dm_markup
+
+                    if client:
+                        success, msg = client.send_message(chat_id=target_chat_override, text=text_to_send, reply_markup=markup_to_send)
+                        status_log = "SENT" if success else "FAILED"
+                        log_alert(
+                            ipo_name=name,
+                            gmp_val=ipo.get("gmp_val", ""),
+                            gmp_percent=gmp_pct,
+                            total_sub=ipo.get("total_sub", ""),
+                            retail_sub=ipo.get("retail_sub", ""),
+                            hni_sub=ipo.get("hni_sub", ""),
+                            qib_sub=ipo.get("qib_sub", ""),
+                            chat_id=target_chat_override,
+                            status=status_log,
+                            details=msg,
+                            sent_at=now_str
+                        )
+                        if success:
+                            alerts_dispatched += 1
+                    else:
+                        # Dry run
+                        print(f"[AlertScheduler] Dry-run alert for '{name}' to '{target_chat_override}' (Token not set):")
+                        log_alert(
+                            ipo_name=name,
+                            gmp_val=ipo.get("gmp_val", ""),
+                            gmp_percent=gmp_pct,
+                            total_sub=ipo.get("total_sub", ""),
+                            retail_sub=ipo.get("retail_sub", ""),
+                            hni_sub=ipo.get("hni_sub", ""),
+                            qib_sub=ipo.get("qib_sub", ""),
+                            chat_id=target_chat_override,
+                            status="DRY_RUN",
+                            details="Alert generated (Token not configured)",
+                            sent_at=now_str
+                        )
                         alerts_dispatched += 1
                 else:
-                    # Dry run / Token not set
-                    print(f"[AlertScheduler] Dry-run alert for '{name}' (Token/ChatID not set):")
-                    log_alert(
-                        ipo_name=name,
-                        gmp_val=ipo.get("gmp_val", ""),
-                        gmp_percent=ipo.get("gmp_percent", 0.0),
-                        total_sub=ipo.get("total_sub", ""),
-                        retail_sub=ipo.get("retail_sub", ""),
-                        hni_sub=ipo.get("hni_sub", ""),
-                        qib_sub=ipo.get("qib_sub", ""),
-                        chat_id=chat_id or "NONE",
-                        status="DRY_RUN",
-                        details="Alert generated (Token/ChatID not configured)",
-                        sent_at=now_str
-                    )
-                    alerts_dispatched += 1
+                    # Dual-broadcast: Group (no buttons) + Approved Subscribers (with buttons)
+                    group_chat = config.chat_id
+                    
+                    # 1. Dispatch to configured Group/Channel (without buttons, threshold >= master min_gmp)
+                    can_send_to_group = group_chat and (gmp_pct >= min_gmp) and (not is_sme or config.enable_sme_alerts)
+                    if can_send_to_group:
+                        if is_ipo_muted(name, chat_id="GLOBAL"):
+                            muted_count += 1
+                            print(f"[AlertScheduler] Skipping group alert for '{name}': Globally muted.")
+                        else:
+                            if client:
+                                success, msg = client.send_message(chat_id=group_chat, text=group_card_html, reply_markup=None)
+                                log_alert(
+                                    ipo_name=name,
+                                    gmp_val=ipo.get("gmp_val", ""),
+                                    gmp_percent=gmp_pct,
+                                    total_sub=ipo.get("total_sub", ""),
+                                    retail_sub=ipo.get("retail_sub", ""),
+                                    hni_sub=ipo.get("hni_sub", ""),
+                                    qib_sub=ipo.get("qib_sub", ""),
+                                    chat_id=group_chat,
+                                    status="SENT" if success else "FAILED",
+                                    details=f"Group dispatch: {msg}",
+                                    sent_at=now_str
+                                )
+                                if success:
+                                    alerts_dispatched += 1
+                            else:
+                                alerts_dispatched += 1
+
+                    # 2. Dispatch to Approved Individual Subscribers (with buttons, personal threshold check)
+                    for sub in approved_subs:
+                        sub_chat_id = sub.get("chat_id")
+                        if not sub_chat_id or sub_chat_id == group_chat:
+                            continue
+                        
+                        # Check SME preference for this user (default: Mainboard only)
+                        sub_sme = bool(sub.get("enable_sme", 0))
+                        if is_sme and not sub_sme:
+                            continue
+                        
+                        # Check user personal threshold
+                        user_threshold = float(sub["gmp_threshold"]) if sub.get("gmp_threshold") is not None else min_gmp
+                        if gmp_pct < user_threshold:
+                            continue
+
+                        # Check user-specific mute
+                        if is_ipo_muted(name, chat_id=sub_chat_id):
+                            continue
+
+                        if client:
+                            success, msg = client.send_message(chat_id=sub_chat_id, text=dm_card_html, reply_markup=dm_markup)
+                            log_alert(
+                                ipo_name=name,
+                                gmp_val=ipo.get("gmp_val", ""),
+                                gmp_percent=gmp_pct,
+                                total_sub=ipo.get("total_sub", ""),
+                                retail_sub=ipo.get("retail_sub", ""),
+                                hni_sub=ipo.get("hni_sub", ""),
+                                qib_sub=ipo.get("qib_sub", ""),
+                                chat_id=sub_chat_id,
+                                status="SENT" if success else "FAILED",
+                                details=f"Subscriber dispatch (@{sub.get('username') or sub.get('first_name')}): {msg}",
+                                sent_at=now_str
+                            )
+                            if success:
+                                alerts_dispatched += 1
+                            time.sleep(0.05) # Polite pacing between Telegram API calls
+                        else:
+                            alerts_dispatched += 1
 
             if alerts_dispatched > 0:
                 status_summary = f"Success ({alerts_dispatched} alert(s) sent)"

@@ -94,7 +94,14 @@ class InvestorGainScraper:
             if not name or name == "Unknown":
                 return None
 
-            category = gmp_item.get("~IPO_Category") or gmp_item.get("~ipo_category1") or "Mainboard"
+            raw_cat = str(gmp_item.get("~IPO_Category") or gmp_item.get("~ipo_category1") or "Mainboard").strip()
+            if raw_cat.upper() in ["IPO", "MAIN", "MAINBOARD", "EQ"]:
+                category = "Mainboard"
+            elif raw_cat.upper() == "SME":
+                category = "SME"
+            else:
+                cleaned = re.sub(r"(?i)\s+ipo$", "", raw_cat).strip()
+                category = cleaned if cleaned else "Mainboard"
 
             # Dates
             raw_start = gmp_item.get("Open") or gmp_item.get("~Srt_Open") or "TBA"
@@ -186,6 +193,8 @@ class InvestorGainScraper:
 
             qib_sub = get_sub_val(sub_item.get("QIB"))
             hni_sub = get_sub_val(sub_item.get("NII") or sub_item.get("SHNI"))
+            shni_sub = get_sub_val(sub_item.get("SHNI") or sub_item.get("NII"))
+            bhni_sub = get_sub_val(sub_item.get("BHNI"))
             retail_sub = get_sub_val(sub_item.get("RII"))
             total_sub = get_sub_val(sub_item.get("Total") or gmp_item.get("Sub"))
 
@@ -195,7 +204,7 @@ class InvestorGainScraper:
 
             if lot_size > 0 and cutoff_price > 0:
                 retail_amount = lot_size * cutoff_price
-                retail_min_order = f"1 Lot ({lot_size:,} shares) • ₹{int(retail_amount):,}"
+                retail_min_order = f"1 Lot ({lot_size:,}) • ₹{int(retail_amount):,}"
 
                 if category.upper() == "SME":
                     # SME HNI is generally 2 lots (minimum application > ₹2 Lakhs)
@@ -206,10 +215,11 @@ class InvestorGainScraper:
                 
                 hni_shares = hni_lots * lot_size
                 hni_amount = hni_shares * cutoff_price
-                hni_min_order = f"{hni_lots} Lots ({hni_shares:,} shares) • ₹{int(hni_amount):,}"
+                lots_label = "Lot" if hni_lots == 1 else "Lots"
+                hni_min_order = f"{hni_lots} {lots_label} ({hni_shares:,}) • ₹{int(hni_amount):,}"
             elif lot_size > 0:
-                retail_min_order = f"1 Lot ({lot_size:,} shares)"
-                hni_min_order = f"2 Lots ({lot_size * 2:,} shares)"
+                retail_min_order = f"1 Lot ({lot_size:,})"
+                hni_min_order = f"2 Lots ({lot_size * 2:,})"
 
             return {
                 "id": ipo_id,
@@ -229,9 +239,12 @@ class InvestorGainScraper:
                 "lot_size": lot_size,
                 "qib_sub": qib_sub,
                 "hni_sub": hni_sub,
+                "shni_sub": shni_sub,
+                "bhni_sub": bhni_sub,
                 "retail_sub": retail_sub,
                 "total_sub": total_sub,
                 "retail_min_order": retail_min_order,
+                "shni_min_order": hni_min_order,
                 "hni_min_order": hni_min_order,
                 "scraped_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }

@@ -12,7 +12,9 @@ from database import (
     get_settings, update_settings, mute_ipo, unmute_ipo,
     get_muted_ipos, is_ipo_muted, get_recent_alert_logs,
     verify_admin_login, create_session, validate_session,
-    delete_session, set_admin_password
+    delete_session, set_admin_password,
+    get_subscribers, get_subscriber, set_subscriber_status, delete_subscriber,
+    set_subscriber_sme
 )
 from bot.telegram_client import TelegramClient
 from scraper.investorgain import InvestorGainScraper
@@ -127,6 +129,13 @@ async def get_settings_page(request: Request):
     if not check_is_authenticated(request):
         return RedirectResponse(url=target_login, status_code=303)
     return templates.TemplateResponse(request=request, name="settings.html", context={"base_path": BASE_PATH})
+
+@app.get("/subscribers", response_class=HTMLResponse)
+async def get_subscribers_page(request: Request):
+    target_login = f"{BASE_PATH}/login" if BASE_PATH else "/login"
+    if not check_is_authenticated(request):
+        return RedirectResponse(url=target_login, status_code=303)
+    return templates.TemplateResponse(request=request, name="subscribers.html", context={"base_path": BASE_PATH})
 
 # Protected API Routes
 @app.get("/api/settings", dependencies=[Depends(require_auth)])
@@ -270,6 +279,105 @@ async def unmute_item(data: Dict[str, str] = Body(...)):
 @app.get("/api/logs", dependencies=[Depends(require_auth)])
 async def get_logs(limit: int = 50):
     return get_recent_alert_logs(limit)
+
+# Subscriber Management API
+@app.get("/api/subscribers", dependencies=[Depends(require_auth)])
+async def list_subscribers():
+    subs = get_subscribers()
+    pending = sum(1 for s in subs if s.get("status") == "pending")
+    approved = sum(1 for s in subs if s.get("status") == "approved")
+    rejected = sum(1 for s in subs if s.get("status") in ["rejected", "unsubscribed"])
+    return {
+        "subscribers": subs,
+        "counts": {
+            "total": len(subs),
+            "pending": pending,
+            "approved": approved,
+            "rejected": rejected
+        }
+    }
+
+@app.post("/api/subscribers/{chat_id}/approve", dependencies=[Depends(require_auth)])
+async def approve_subscriber(chat_id: str):
+    sub = get_subscriber(chat_id)
+    if not sub:
+        raise HTTPException(status_code=404, detail="Subscriber not found")
+    
+    set_subscriber_status(chat_id, "approved")
+    
+    # Notify user via Telegram bot if token is configured
+    token = config.bot_token
+    notified = False
+    if token:
+        try:
+            client = TelegramClient(token)
+            msg = (
+                "🎉 <b>Subscription Approved!</b>\n\n"
+                "Your request has been approved by the administrator. You will now receive high-GMP IPO alerts directly in this chat!\n\n"
+                "• Send <code>/check</code> anytime to see open IPOs.\n"
+                "• Send <code>/help</code> to view available commands."
+            )
+            success, _ = client.send_message(chat_id=chat_id, text=msg)
+            notified = success
+        except Exception:
+            pass
+            
+    return {"status": "success", "message": f"Subscriber {chat_id} approved", "notified": notified}
+
+@app.post("/api/subscribers/{chat_id}/reject", dependencies=[Depends(require_auth)])
+async def reject_subscriber(chat_id: str):
+    sub = get_subscriber(chat_id)
+    if not sub:
+        raise HTTPException(status_code=404, detail="Subscriber not found")
+    
+    set_subscriber_status(chat_id, "rejected")
+    return {"status": "success", "message": f"Subscriber {chat_id} rejected"}
+
+@app.delete("/api/subscribers/{chat_id}", dependencies=[Depends(require_auth)])
+async def remove_subscriber(chat_id: str):
+    success = delete_subscriber(chat_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Subscriber not found")
+    return {"status": "success", "message": f"Subscriber {chat_id} deleted"}
+
+@app.post("/api/subscribers/{chat_id}/toggle-sme", dependencies=[Depends(require_auth)])
+async def toggle_subscriber_sme(chat_id: str):
+    sub = get_subscriber(chat_id)
+    if not sub:
+        raise HTTPException(status_code=404, detail="Subscriber not found")
+    
+    current_sme = bool(sub.get("enable_sme", 0))
+    new_sme = not current_sme
+    set_subscriber_sme(chat_id, new_sme)
+    return {"status": "success", "enable_sme": new_sme, "message": f"SME alerts {'enabled' if new_sme else 'disabled'} for subscriber"}
+
+@app.post("/api/subscribers/{chat_id}/test", dependencies=[Depends(require_auth)])
+async def test_subscriber(chat_id: str):
+    sub = get_subscriber(chat_id)
+    if not sub:
+        raise HTTPException(status_code=404, detail="Subscriber not found")
+    
+    token = config.bot_token
+    if not token:
+        raise HTTPException(status_code=400, detail="Bot token is not configured in Settings")
+    
+    client = TelegramClient(token)
+    name = sub.get("first_name") or "there"
+    thresh = sub.get("gmp_threshold") if sub.get("gmp_threshold") is not None else config.gmp_threshold
+    thresh_tag = " (Customized)" if sub.get("gmp_threshold") is not None else " (System Default)"
+    test_msg = (
+        f"⚡ <b>IPO Wise Test Alert</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"👋 Hello <b>{name}</b>!\n\n"
+        f"This is a test notification confirming that your Telegram connection to <b>IPO Wise</b> is active and working.\n\n"
+        f"📊 <b>Your Alert Threshold:</b> GMP ≥ <b>{thresh}%</b>{thresh_tag}\n"
+        f"<i>(Only IPOs meeting or exceeding this threshold will trigger direct alerts. You can change this anytime with <code>/threshold &lt;number&gt;</code>)</i>"
+    )
+    success, msg = client.send_message(chat_id=chat_id, text=test_msg)
+    if not success:
+        raise HTTPException(status_code=400, detail=f"Failed to send test message to {chat_id}: {msg}")
+    
+    return {"status": "success", "message": f"Test alert delivered successfully to {chat_id}"}
 
 # Create mountable server app if BASE_PATH is provided
 if BASE_PATH:

@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Subscribers Management — IPO Wise</title>
+  <meta name="description" content="Manage Telegram subscriber requests, approve private alert recipients, and view subscriber status.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ base_path }}/static/style.css?v=3.4">
+  <script>window.BASE_PATH = "{{ base_path }}";</script>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div class="brand-wrapper">
+        <div class="brand-logo">👥</div>
+        <div class="brand-title">
+          <h1>IPO Wise <span style="font-size: 13px; font-weight: 500; color: var(--cyan); background: rgba(6,182,212,0.15); padding: 2px 8px; border-radius: 6px;">Subscribers</span></h1>
+          <p>Review Telegram user access requests and manage direct alert subscribers</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <!-- Navigation Links -->
+        <nav class="header-nav">
+          <a href="{{ base_path }}/" class="nav-link">📈 Live Market</a>
+          <a href="{{ base_path }}/subscribers" class="nav-link active">👥 Subscribers</a>
+          <a href="{{ base_path }}/settings" class="nav-link">⚙️ Bot Settings</a>
+        </nav>
+
+        <button type="button" class="btn btn-secondary" style="padding: 6px 14px; font-size: 13px;" onclick="loadSubscribers()">
+          🔄 Refresh
+        </button>
+
+        <a href="{{ base_path }}/logout" class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px; text-decoration: none;" title="Sign out">
+          🔒 Logout
+        </a>
+      </div>
+    </header>
+
+    <!-- Quick Stats Grid -->
+    <section class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(99, 102, 241, 0.15); color: #818cf8;">👥</div>
+        <div class="stat-info">
+          <h3>Total Users</h3>
+          <p id="stat-total-subs">--</p>
+        </div>
+      </div>
+      <div class="stat-card" id="card-pending-badge">
+        <div class="stat-icon" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;">⏳</div>
+        <div class="stat-info">
+          <h3>Pending Approval</h3>
+          <p id="stat-pending-subs">--</p>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">✅</div>
+        <div class="stat-info">
+          <h3>Approved Active</h3>
+          <p id="stat-approved-subs">--</p>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(244, 63, 94, 0.15); color: #fb7185;">🚫</div>
+        <div class="stat-info">
+          <h3>Rejected / Inactive</h3>
+          <p id="stat-rejected-subs">--</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Main Subscribers Panel -->
+    <main class="glass-panel">
+      <div class="panel-header" style="flex-wrap: wrap; gap: 14px; align-items: center;">
+        <div>
+          <h2 class="panel-title">Telegram Subscriber Approvals</h2>
+          <p style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
+            Users who send <code>/subscribe</code> or <code>/start</code> to your bot appear here for approval before receiving private alerts.
+          </p>
+        </div>
+
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <input type="text" id="subscriber-search" class="custom-input" placeholder="🔍 Search name, @username, or chat ID..." style="width: 280px; padding: 8px 12px; font-size: 13px;" oninput="renderTable()">
+        </div>
+      </div>
+
+      <!-- Filter Pills -->
+      <div style="display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 12px;">
+        <button id="pill-all" class="filter-btn active" onclick="setFilter('all')">
+          All Users <span class="filter-count" id="badge-all">0</span>
+        </button>
+        <button id="pill-pending" class="filter-btn" onclick="setFilter('pending')">
+          ⏳ Pending <span class="filter-count" id="badge-pending">0</span>
+        </button>
+        <button id="pill-approved" class="filter-btn" onclick="setFilter('approved')">
+          ✅ Approved <span class="filter-count" id="badge-approved">0</span>
+        </button>
+        <button id="pill-rejected" class="filter-btn" onclick="setFilter('rejected')">
+          🚫 Rejected <span class="filter-count" id="badge-rejected">0</span>
+        </button>
+      </div>
+
+      <!-- Table -->
+      <div class="table-wrap">
+        <table id="subscribers-table">
+          <thead>
+            <tr>
+              <th>Telegram User</th>
+              <th>Username</th>
+              <th>Chat / User ID</th>
+              <th>Status</th>
+              <th>Categories</th>
+              <th>Alert Threshold</th>
+              <th>Requested On</th>
+              <th style="text-align: right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="subscribers-tbody">
+            <tr>
+              <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 32px;">
+                Loading subscribers...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" style="position: fixed; bottom: 24px; right: 24px; background: #1e293b; color: #fff; padding: 12px 20px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); opacity: 0; pointer-events: none; transition: opacity 0.3s ease; z-index: 9999; font-size: 13.5px;"></div>
+
+  <script>
+    let allSubscribers = [];
+    let currentFilter = 'all';
+    let systemDefaultThreshold = 15.0;
+
+    function showToast(msg, isError = false) {
+      const t = document.getElementById('toast');
+      t.innerHTML = msg;
+      t.style.borderColor = isError ? '#f43f5e' : '#10b981';
+      t.style.opacity = '1';
+      setTimeout(() => { t.style.opacity = '0'; }, 3500);
+    }
+
+    function setFilter(filter) {
+      currentFilter = filter;
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      const activeBtn = document.getElementById(`pill-${filter}`);
+      if (activeBtn) activeBtn.classList.add('active');
+      renderTable();
+    }
+
+    async function loadSubscribers() {
+      try {
+        // Also fetch settings to get system default GMP threshold
+        try {
+          const sResp = await fetch(`${window.BASE_PATH || ''}/api/settings`);
+          if (sResp.ok) {
+            const sData = await sResp.json();
+            if (sData.gmp_threshold) systemDefaultThreshold = parseFloat(sData.gmp_threshold);
+          }
+        } catch (_) {}
+
+        const resp = await fetch(`${window.BASE_PATH || ''}/api/subscribers`);
+        if (resp.status === 401) {
+          window.location.href = `${window.BASE_PATH || ''}/login`;
+          return;
+        }
+        const data = await resp.json();
+        allSubscribers = data.subscribers || [];
+        
+        const counts = data.counts || { total: 0, pending: 0, approved: 0, rejected: 0 };
+        document.getElementById('stat-total-subs').innerText = counts.total;
+        document.getElementById('stat-pending-subs').innerText = counts.pending;
+        document.getElementById('stat-approved-subs').innerText = counts.approved;
+        document.getElementById('stat-rejected-subs').innerText = counts.rejected;
+
+        document.getElementById('badge-all').innerText = counts.total;
+        document.getElementById('badge-pending').innerText = counts.pending;
+        document.getElementById('badge-approved').innerText = counts.approved;
+        document.getElementById('badge-rejected').innerText = counts.rejected;
+
+        const pendingCard = document.getElementById('card-pending-badge');
+        if (counts.pending > 0) {
+          pendingCard.style.border = '1px solid rgba(245, 158, 11, 0.5)';
+          pendingCard.style.boxShadow = '0 0 15px rgba(245, 158, 11, 0.2)';
+        } else {
+          pendingCard.style.border = '1px solid var(--border-subtle)';
+          pendingCard.style.boxShadow = 'none';
+        }
+
+        renderTable();
+      } catch (err) {
+        console.error("Failed to load subscribers", err);
+        showToast("Error loading subscriber list", true);
+      }
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('subscribers-tbody');
+      const search = (document.getElementById('subscriber-search').value || '').toLowerCase().trim();
+
+      let filtered = allSubscribers.filter(s => {
+        if (currentFilter === 'pending' && s.status !== 'pending') return false;
+        if (currentFilter === 'approved' && s.status !== 'approved') return false;
+        if (currentFilter === 'rejected' && s.status !== 'rejected' && s.status !== 'unsubscribed') return false;
+
+        if (search) {
+          const name = `${s.first_name || ''} ${s.last_name || ''}`.toLowerCase();
+          const uname = (s.username || '').toLowerCase();
+          const cid = (s.chat_id || '').toLowerCase();
+          return name.includes(search) || uname.includes(search) || cid.includes(search);
+        }
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 40px;">
+              No subscribers found matching this view.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(s => {
+        const fullName = `${s.first_name || ''} ${s.last_name || ''}`.trim() || 'Anonymous User';
+        const uname = s.username ? `<a href="https://t.me/${s.username}" target="_blank" style="color: var(--cyan); text-decoration: none;">@${s.username}</a>` : '<span style="color: var(--text-dim);">-</span>';
+        
+        let statusBadge = '';
+        if (s.status === 'approved') {
+          statusBadge = `<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);">✅ Approved</span>`;
+        } else if (s.status === 'pending') {
+          statusBadge = `<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3);">⏳ Pending</span>`;
+        } else if (s.status === 'unsubscribed') {
+          statusBadge = `<span class="badge" style="background: rgba(148, 163, 184, 0.15); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.3);">🔕 Unsubscribed</span>`;
+        } else {
+          statusBadge = `<span class="badge" style="background: rgba(244, 63, 94, 0.15); color: #fb7185; border: 1px solid rgba(244, 63, 94, 0.3);">🚫 Rejected</span>`;
+        }
+
+        const isSme = Boolean(s.enable_sme);
+        const categoriesBadge = isSme 
+          ? `<button type="button" class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); cursor: pointer;" onclick="toggleSme('${s.chat_id}')" title="Click to toggle SME off">Mainboard + SME</button>`
+          : `<button type="button" class="badge" style="background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.3); cursor: pointer;" onclick="toggleSme('${s.chat_id}')" title="Click to toggle SME on">Mainboard only</button>`;
+
+        let threshDisplay = '';
+        if (s.gmp_threshold !== null && s.gmp_threshold !== undefined && !isNaN(s.gmp_threshold)) {
+          threshDisplay = `<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); font-size: 11.5px;" title="Customized threshold via chat">🔥 ≥ ${s.gmp_threshold}%</span>`;
+        } else {
+          threshDisplay = `<span style="color: var(--text-dim); font-size: 12px;" title="Following system default">Default (≥ ${systemDefaultThreshold}%)</span>`;
+        }
+
+        let actionBtns = '';
+        if (s.status === 'pending') {
+          actionBtns = `
+            <button type="button" class="btn btn-emerald" style="padding: 5px 10px; font-size: 12px;" onclick="approveUser('${s.chat_id}', '${escapeHtml(fullName)}')">
+              ✅ Approve
+            </button>
+            <button type="button" class="btn btn-secondary" style="padding: 5px 10px; font-size: 12px; color: var(--rose);" onclick="rejectUser('${s.chat_id}')">
+              Reject
+            </button>
+          `;
+        } else if (s.status === 'approved') {
+          actionBtns = `
+            <button type="button" class="btn btn-secondary" style="padding: 5px 10px; font-size: 12px; color: var(--rose);" onclick="rejectUser('${s.chat_id}')">
+              Revoke
+            </button>
+          `;
+        } else {
+          actionBtns = `
+            <button type="button" class="btn btn-emerald" style="padding: 5px 10px; font-size: 12px;" onclick="approveUser('${s.chat_id}', '${escapeHtml(fullName)}')">
+              ✅ Approve
+            </button>
+          `;
+        }
+
+        // Test Message Button
+        actionBtns += `
+          <button type="button" class="btn btn-secondary" style="padding: 5px 10px; font-size: 12px; color: var(--cyan); margin-left: 2px;" onclick="sendTestAlert('${s.chat_id}', '${escapeHtml(fullName)}')" title="Send test Telegram alert">
+            🧪 Test
+          </button>
+          <button type="button" class="btn btn-secondary" style="padding: 5px 8px; font-size: 12px; margin-left: 2px;" onclick="deleteUser('${s.chat_id}')" title="Delete record">
+            🗑️
+          </button>
+        `;
+
+        return `
+          <tr>
+            <td>
+              <div style="font-weight: 600; color: var(--text-main);">${escapeHtml(fullName)}</div>
+            </td>
+            <td>${uname}</td>
+            <td><code>${s.chat_id}</code></td>
+            <td>${statusBadge}</td>
+            <td>${categoriesBadge}</td>
+            <td>${threshDisplay}</td>
+            <td style="color: var(--text-muted); font-size: 12.5px;">${s.created_at ? s.created_at.slice(0, 16) : '-'}</td>
+            <td style="text-align: right;">
+              <div style="display: inline-flex; align-items: center; gap: 4px;">
+                ${actionBtns}
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    async function toggleSme(chatId) {
+      try {
+        const resp = await fetch(`${window.BASE_PATH || ''}/api/subscribers/${chatId}/toggle-sme`, {
+          method: 'POST'
+        });
+        const data = await resp.json();
+        if (resp.ok) {
+          showToast(data.enable_sme ? 'SME alerts enabled for user' : 'SME alerts disabled for user');
+          await loadSubscribers();
+        } else {
+          showToast(data.detail || 'Failed to toggle SME', true);
+        }
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+
+    async function sendTestAlert(chatId, name) {
+      showToast(`Sending test alert to ${name}...`);
+      try {
+        const resp = await fetch(`${window.BASE_PATH || ''}/api/subscribers/${chatId}/test`, {
+          method: 'POST'
+        });
+        const data = await resp.json();
+        if (resp.ok) {
+          showToast(`⚡ Test alert delivered to ${name}!`);
+        } else {
+          showToast(data.detail || 'Failed to send test alert', true);
+        }
+      } catch (err) {
+        showToast('Network error while testing connection', true);
+      }
+    }
+
+    async function approveUser(chatId, name) {
+      try {
+        const resp = await fetch(`${window.BASE_PATH || ''}/api/subscribers/${chatId}/approve`, {
+          method: 'POST'
+        });
+        const data = await resp.json();
+        if (resp.ok) {
+          const notifiedMsg = data.notified ? ' & notified via Telegram' : '';
+          showToast(`✅ Approved ${name}${notifiedMsg}!`);
+          loadSubscribers();
+        } else {
+          showToast(data.detail || 'Approval failed', true);
+        }
+      } catch (err) {
+        showToast('Network error while approving', true);
+      }
+    }
+
+    async function rejectUser(chatId) {
+      try {
+        const resp = await fetch(`${window.BASE_PATH || ''}/api/subscribers/${chatId}/reject`, {
+          method: 'POST'
+        });
+        const data = await resp.json();
+        if (resp.ok) {
+          showToast(`Access revoked for ${chatId}`);
+          loadSubscribers();
+        } else {
+          showToast(data.detail || 'Rejection failed', true);
+        }
+      } catch (err) {
+        showToast('Network error while rejecting', true);
+      }
+    }
+
+    async function deleteUser(chatId) {
+      if (!confirm(`Are you sure you want to remove subscriber ${chatId}?`)) return;
+      try {
+        const resp = await fetch(`${window.BASE_PATH || ''}/api/subscribers/${chatId}`, {
+          method: 'DELETE'
+        });
+        const data = await resp.json();
+        if (resp.ok) {
+          showToast(`Subscriber ${chatId} deleted`);
+          loadSubscribers();
+        } else {
+          showToast(data.detail || 'Delete failed', true);
+        }
+      } catch (err) {
+        showToast('Network error while deleting', true);
+      }
+    }
+
+    function escapeHtml(str) {
+      return (str || '').replace(/[&<>"']/g, m => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+      }[m]));
+    }
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', () => {
+      loadSubscribers();
+    });
+  </script>
+</body>
+</html>

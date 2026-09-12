@@ -23,15 +23,59 @@ def init_db():
     """)
     
     # Table for muted/ignored IPOs
+    cursor.execute("PRAGMA table_info(muted_ipos)")
+    cols = [r["name"] for r in cursor.fetchall()]
+    if cols and "chat_id" not in cols:
+        cursor.execute("""
+        CREATE TABLE muted_ipos_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_id TEXT NOT NULL DEFAULT 'GLOBAL',
+            ipo_name TEXT NOT NULL,
+            clean_name TEXT NOT NULL,
+            action TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            UNIQUE(chat_id, clean_name)
+        )
+        """)
+        cursor.execute("""
+        INSERT OR IGNORE INTO muted_ipos_new (id, chat_id, ipo_name, clean_name, action, created_at)
+        SELECT id, 'GLOBAL', ipo_name, clean_name, action, created_at FROM muted_ipos
+        """)
+        cursor.execute("DROP TABLE muted_ipos")
+        cursor.execute("ALTER TABLE muted_ipos_new RENAME TO muted_ipos")
+    else:
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS muted_ipos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_id TEXT NOT NULL DEFAULT 'GLOBAL',
+            ipo_name TEXT NOT NULL,
+            clean_name TEXT NOT NULL,
+            action TEXT NOT NULL, -- 'APPLIED' or 'IGNORED'
+            created_at TEXT NOT NULL,
+            UNIQUE(chat_id, clean_name)
+        )
+        """)
+
+    # Table for subscribers (Telegram users)
     cursor.execute("""
-    CREATE TABLE IF NOT EXISTS muted_ipos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        ipo_name TEXT UNIQUE NOT NULL,
-        clean_name TEXT NOT NULL,
-        action TEXT NOT NULL, -- 'APPLIED' or 'IGNORED'
-        created_at TEXT NOT NULL
+    CREATE TABLE IF NOT EXISTS subscribers (
+        chat_id TEXT PRIMARY KEY,
+        username TEXT,
+        first_name TEXT,
+        last_name TEXT,
+        status TEXT NOT NULL DEFAULT 'pending', -- 'pending', 'approved', 'rejected', 'unsubscribed'
+        gmp_threshold REAL DEFAULT NULL,
+        enable_sme INTEGER DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
     )
     """)
+    cursor.execute("PRAGMA table_info(subscribers)")
+    sub_cols = [r["name"] for r in cursor.fetchall()]
+    if sub_cols and "gmp_threshold" not in sub_cols:
+        cursor.execute("ALTER TABLE subscribers ADD COLUMN gmp_threshold REAL DEFAULT NULL")
+    if sub_cols and "enable_sme" not in sub_cols:
+        cursor.execute("ALTER TABLE subscribers ADD COLUMN enable_sme INTEGER DEFAULT 0")
     
     # Table for dispatch alert logs
     cursor.execute("""
@@ -103,51 +147,202 @@ def clean_ipo_key(name: str) -> str:
     """Normalize IPO name for robust matching (lowercase, alphanumeric only)"""
     return "".join(c for c in name.lower() if c.isalnum())
 
-def mute_ipo(ipo_name: str, action: str = "IGNORED") -> bool:
-    """Mute an IPO from further alerts (action: APPLIED or IGNORED)"""
+def mute_ipo(ipo_name: str, chat_id: str = "GLOBAL", action: str = "IGNORED") -> bool:
+    """Mute an IPO from alerts for a user or globally (action: APPLIED or IGNORED)"""
     clean_k = clean_ipo_key(ipo_name)
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cid = str(chat_id or "GLOBAL").strip()
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
         cursor.execute("""
-        INSERT INTO muted_ipos (ipo_name, clean_name, action, created_at)
-        VALUES (?, ?, ?, ?)
-        ON CONFLICT(ipo_name) DO UPDATE SET action=excluded.action, created_at=excluded.created_at
-        """, (ipo_name.strip(), clean_k, action.upper(), now_str))
+        INSERT INTO muted_ipos (chat_id, ipo_name, clean_name, action, created_at)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(chat_id, clean_name) DO UPDATE SET
+            action=excluded.action,
+            created_at=excluded.created_at,
+            ipo_name=excluded.ipo_name
+        """, (cid, ipo_name.strip(), clean_k, action.upper(), now_str))
         conn.commit()
         return True
     finally:
         conn.close()
 
-def unmute_ipo(ipo_name: str) -> bool:
+def unmute_ipo(ipo_name: str, chat_id: str = "GLOBAL") -> bool:
     """Unmute an IPO so alerts can resume if eligible"""
     clean_k = clean_ipo_key(ipo_name)
+    cid = str(chat_id or "GLOBAL").strip()
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("DELETE FROM muted_ipos WHERE clean_name = ? OR ipo_name = ?", (clean_k, ipo_name.strip()))
+        if cid == "GLOBAL":
+            cursor.execute("DELETE FROM muted_ipos WHERE clean_name = ? OR ipo_name = ?", (clean_k, ipo_name.strip()))
+        else:
+            cursor.execute("DELETE FROM muted_ipos WHERE (chat_id = ? OR chat_id = 'GLOBAL') AND (clean_name = ? OR ipo_name = ?)", (cid, clean_k, ipo_name.strip()))
         conn.commit()
         return cursor.rowcount > 0
     finally:
         conn.close()
 
-def is_ipo_muted(ipo_name: str) -> bool:
+def is_ipo_muted(ipo_name: str, chat_id: Optional[str] = None) -> bool:
     clean_k = clean_ipo_key(ipo_name)
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id FROM muted_ipos WHERE clean_name = ? OR ipo_name = ?", (clean_k, ipo_name.strip()))
+    if chat_id:
+        cid = str(chat_id).strip()
+        cursor.execute("""
+        SELECT id FROM muted_ipos
+        WHERE (clean_name = ? OR ipo_name = ?) AND (chat_id = 'GLOBAL' OR chat_id = ?)
+        """, (clean_k, ipo_name.strip(), cid))
+    else:
+        cursor.execute("""
+        SELECT id FROM muted_ipos
+        WHERE (clean_name = ? OR ipo_name = ?) AND chat_id = 'GLOBAL'
+        """, (clean_k, ipo_name.strip()))
     row = cursor.fetchone()
     conn.close()
     return row is not None
 
-def get_muted_ipos() -> List[Dict[str, Any]]:
+def get_muted_ipos(chat_id: Optional[str] = None) -> List[Dict[str, Any]]:
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, ipo_name, action, created_at FROM muted_ipos ORDER BY id DESC")
+    if chat_id:
+        cursor.execute("SELECT id, chat_id, ipo_name, action, created_at FROM muted_ipos WHERE chat_id = ? OR chat_id = 'GLOBAL' ORDER BY id DESC", (str(chat_id).strip(),))
+    else:
+        cursor.execute("SELECT id, chat_id, ipo_name, action, created_at FROM muted_ipos ORDER BY id DESC")
     rows = cursor.fetchall()
     conn.close()
     return [dict(row) for row in rows]
+
+def cleanup_closed_muted_ipos(active_open_names: List[str]) -> int:
+    """Removes muted IPO entries for IPOs that are no longer active/open to prevent table bloat."""
+    if not active_open_names:
+        return 0
+    active_clean_keys = set(clean_ipo_key(n) for n in active_open_names if n)
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT id, clean_name FROM muted_ipos")
+        rows = cursor.fetchall()
+        to_delete = [row["id"] for row in rows if row["clean_name"] not in active_clean_keys]
+        if to_delete:
+            placeholders = ",".join("?" * len(to_delete))
+            cursor.execute(f"DELETE FROM muted_ipos WHERE id IN ({placeholders})", to_delete)
+            conn.commit()
+            return len(to_delete)
+        return 0
+    finally:
+        conn.close()
+
+# Subscriber Management Functions
+def register_or_update_subscriber(chat_id: str, username: str = "", first_name: str = "", last_name: str = "") -> Dict[str, Any]:
+    cid = str(chat_id).strip()
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT * FROM subscribers WHERE chat_id = ?", (cid,))
+        existing = cursor.fetchone()
+        if existing:
+            current = dict(existing)
+            # If user was unsubscribed or rejected and requested again, set back to pending
+            new_status = "pending" if current["status"] in ["unsubscribed", "rejected"] else current["status"]
+            cursor.execute("""
+            UPDATE subscribers 
+            SET username = ?, first_name = ?, last_name = ?, status = ?, updated_at = ?
+            WHERE chat_id = ?
+            """, (username or current.get("username", ""), first_name or current.get("first_name", ""), last_name or current.get("last_name", ""), new_status, now_str, cid))
+            conn.commit()
+            current["status"] = new_status
+            return current
+        else:
+            cursor.execute("""
+            INSERT INTO subscribers (chat_id, username, first_name, last_name, status, created_at, updated_at)
+            VALUES (?, ?, ?, ?, 'pending', ?, ?)
+            """, (cid, username, first_name, last_name, now_str, now_str))
+            conn.commit()
+            return {
+                "chat_id": cid,
+                "username": username,
+                "first_name": first_name,
+                "last_name": last_name,
+                "status": "pending",
+                "created_at": now_str,
+                "updated_at": now_str
+            }
+    finally:
+        conn.close()
+
+def get_subscriber(chat_id: str) -> Optional[Dict[str, Any]]:
+    cid = str(chat_id).strip()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM subscribers WHERE chat_id = ?", (cid,))
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+def get_subscribers(status: Optional[str] = None) -> List[Dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    if status:
+        cursor.execute("SELECT * FROM subscribers WHERE status = ? ORDER BY created_at DESC", (status.strip(),))
+    else:
+        cursor.execute("SELECT * FROM subscribers ORDER BY created_at DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+def get_approved_subscribers() -> List[Dict[str, Any]]:
+    return get_subscribers(status="approved")
+
+def set_subscriber_status(chat_id: str, status: str) -> bool:
+    cid = str(chat_id).strip()
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("UPDATE subscribers SET status = ?, updated_at = ? WHERE chat_id = ?", (status.strip(), now_str, cid))
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
+
+def set_subscriber_threshold(chat_id: str, threshold: Optional[float]) -> bool:
+    cid = str(chat_id).strip()
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("UPDATE subscribers SET gmp_threshold = ?, updated_at = ? WHERE chat_id = ?", (threshold, now_str, cid))
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
+
+def set_subscriber_sme(chat_id: str, enable_sme: bool) -> bool:
+    cid = str(chat_id).strip()
+    val = 1 if enable_sme else 0
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("UPDATE subscribers SET enable_sme = ?, updated_at = ? WHERE chat_id = ?", (val, now_str, cid))
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
+
+def delete_subscriber(chat_id: str) -> bool:
+    cid = str(chat_id).strip()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM subscribers WHERE chat_id = ?", (cid,))
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
 
 def log_alert(ipo_name: str, gmp_val: str, gmp_percent: float, total_sub: str,
               retail_sub: str, hni_sub: str, qib_sub: str, chat_id: str,

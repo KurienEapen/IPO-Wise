@@ -2,8 +2,8 @@
 const BASE_PATH = window.BASE_PATH || '';
 let currentSettings = {};
 let allIpos = [];
-let currentStatusFilter = 'open';
-let currentBoardFilter = 'all';
+let currentStatusFilter = 'high-gmp';
+let currentBoardFilter = 'mainboard';
 let hideClosedAndPast = false;
 let currentTab = 'market';
 
@@ -480,14 +480,15 @@ function renderIposTable() {
         </td>
         <td>
           <div style="font-size: 12px;"><b>Total:</b> ${ipo.total_sub}</div>
-          <div style="font-size: 11px; color: var(--text-muted);">
-            Retail: ${ipo.retail_sub} • HNI: ${ipo.hni_sub} • QIB: ${ipo.qib_sub}
+          <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px; line-height: 1.45;">
+            <div>sHNI: <b>${ipo.shni_sub || ipo.hni_sub || '-'}</b> • bHNI: <b>${ipo.bhni_sub || '-'}</b></div>
+            <div>Retail: <b>${ipo.retail_sub || '-'}</b> • QIB: <b>${ipo.qib_sub || '-'}</b></div>
           </div>
         </td>
         <td>
           <div style="font-size: 12px;"><b>Price:</b> ${ipo.price}</div>
           <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;"><b>Retail:</b> ${ipo.retail_min_order}</div>
-          <div style="font-size: 11.5px; color: var(--text-muted);"><b>HNI:</b> ${ipo.hni_min_order}</div>
+          <div style="font-size: 11.5px; color: var(--text-muted);"><b>sHNI:</b> ${ipo.shni_min_order || ipo.hni_min_order || '-'}</div>
         </td>
         <td>
           <div style="display: flex; gap: 6px; align-items: center;">
@@ -557,16 +558,17 @@ function renderIposTable() {
             <div class="detail-col">
               <span class="detail-col-title">📊 Subscription Demand</span>
               <div class="detail-col-primary">Total: <b>${ipo.total_sub}</b></div>
-              <div class="detail-col-sub">
-                R: <b>${ipo.retail_sub || '-'}</b> • H: <b>${ipo.hni_sub || '-'}</b> • Q: <b>${ipo.qib_sub || '-'}</b>
+              <div class="detail-col-sub" style="line-height: 1.45; margin-top: 3px;">
+                <div>sHNI: <b>${ipo.shni_sub || ipo.hni_sub || '-'}</b> • bHNI: <b>${ipo.bhni_sub || '-'}</b></div>
+                <div>Retail: <b>${ipo.retail_sub || '-'}</b> • QIB: <b>${ipo.qib_sub || '-'}</b></div>
               </div>
             </div>
             <div class="detail-col">
               <span class="detail-col-title">💰 Price &amp; Order</span>
               <div class="detail-col-primary"><b>${ipo.price}</b></div>
-              <div class="detail-col-sub">
+              <div class="detail-col-sub" style="margin-top: 3px;">
                 <div>Retail: <b>${ipo.retail_min_order}</b></div>
-                ${ipo.hni_min_order ? `<div>HNI: <b>${ipo.hni_min_order}</b></div>` : ''}
+                ${(ipo.shni_min_order || ipo.hni_min_order) ? `<div>sHNI: <b>${ipo.shni_min_order || ipo.hni_min_order}</b></div>` : ''}
               </div>
             </div>
           </div>
@@ -809,9 +811,9 @@ function getReminderCalendarData(ipo) {
     `IPO: ${ipo.name}\n` +
     `Closing Date: Today (Cutoff at 5:00 PM IST)\n` +
     `Current GMP: ${ipo.gmp_val} (+${ipo.gmp_percent}%)\n` +
-    `Issue Price: ${ipo.price}\n` +
     `Retail Min Order: ${ipo.retail_min_order}\n` +
-    `Total Demand: ${ipo.total_sub}\n\n` +
+    `sHNI Min Order: ${ipo.shni_min_order || ipo.hni_min_order || '-'}\n` +
+    `Subscription: Total ${ipo.total_sub} (sHNI: ${ipo.shni_sub || '-'}, bHNI: ${ipo.bhni_sub || '-'}, Retail: ${ipo.retail_sub || '-'})\n\n` +
     `Important: Complete your bid and authorize the UPI mandate before 5:00 PM IST!`;
 
   return {
