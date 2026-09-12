@@ -2,7 +2,8 @@
 const BASE_PATH = window.BASE_PATH || '';
 let currentSettings = {};
 let allIpos = [];
-let currentFilter = 'open';
+let currentStatusFilter = 'open';
+let currentBoardFilter = 'all';
 let hideClosedAndPast = false;
 let currentTab = 'market';
 
@@ -136,7 +137,8 @@ async function loadIpos(force = false) {
     document.getElementById('stat-high-gmp-count').innerText = highGmpCount;
 
     updateFilterCounts();
-    setTableFilter(currentFilter);
+    updateFilterUI();
+    renderIposTable();
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="6" class="empty-state">Failed to load live IPO data.</td></tr>`;
   }
@@ -145,6 +147,26 @@ async function loadIpos(force = false) {
 function isClosedOrPast(ipo) {
   const st = (ipo.status || '').toUpperCase();
   return st === 'CLOSED' || st === 'LISTED_PAST' || st.includes('PAST');
+}
+
+function isClosingToday(ipo) {
+  return Boolean(ipo && (ipo.is_closing_today || (ipo.status || '').toUpperCase() === 'CLOSING_TODAY'));
+}
+
+function matchesStatus(ipo, statusFilter, thresh) {
+  if (statusFilter === 'all') return true;
+  if (statusFilter === 'open') return Boolean(ipo.is_open);
+  if (statusFilter === 'closing') return isClosingToday(ipo);
+  if (statusFilter === 'high-gmp') return Boolean(ipo.is_open && ipo.gmp_percent >= thresh);
+  return true;
+}
+
+function matchesBoard(ipo, boardFilter) {
+  const isSme = (ipo.category || '').toUpperCase() === 'SME';
+  if (boardFilter === 'all') return true;
+  if (boardFilter === 'mainboard') return !isSme;
+  if (boardFilter === 'sme') return isSme;
+  return true;
 }
 
 function updateHideClosedUI() {
@@ -177,46 +199,80 @@ function toggleHideClosed() {
 
 function updateFilterCounts() {
   const thresh = parseFloat(currentSettings.gmp_threshold || 15.0);
+  
+  // Status counts
   const countAll = allIpos.length;
   const countOpen = allIpos.filter(i => i.is_open).length;
-  const countMain = allIpos.filter(i => (i.category || '').toUpperCase() !== 'SME').length;
-  const countSme = allIpos.filter(i => (i.category || '').toUpperCase() === 'SME').length;
+  const countClosing = allIpos.filter(isClosingToday).length;
   const countHighGmp = allIpos.filter(i => i.is_open && i.gmp_percent >= thresh).length;
 
   const elAll = document.getElementById('count-all');
   if (elAll) elAll.innerText = countAll;
   const elOpen = document.getElementById('count-open');
   if (elOpen) elOpen.innerText = countOpen;
+  const elClosing = document.getElementById('count-closing');
+  if (elClosing) elClosing.innerText = countClosing;
+  const elHigh = document.getElementById('count-high-gmp');
+  if (elHigh) elHigh.innerText = countHighGmp;
+
+  // Board counts scoped to active status filter pool
+  const statusPool = allIpos.filter(i => matchesStatus(i, currentStatusFilter, thresh));
+  const countBoardAll = statusPool.length;
+  const countMain = statusPool.filter(i => (i.category || '').toUpperCase() !== 'SME').length;
+  const countSme = statusPool.filter(i => (i.category || '').toUpperCase() === 'SME').length;
+
+  const elBoardAll = document.getElementById('count-board-all');
+  if (elBoardAll) elBoardAll.innerText = countBoardAll;
   const elMain = document.getElementById('count-main');
   if (elMain) elMain.innerText = countMain;
   const elSme = document.getElementById('count-sme');
   if (elSme) elSme.innerText = countSme;
-  const elHigh = document.getElementById('count-high-gmp');
-  if (elHigh) elHigh.innerText = countHighGmp;
 
   updateHideClosedUI();
 }
 
-function setTableFilter(filter) {
-  currentFilter = filter;
-  
-  // Highlight active filter pill
-  document.querySelectorAll('.filter-pills-bar button').forEach(b => {
-    b.classList.remove('active');
-  });
-  const btnMap = {
+function updateFilterUI() {
+  // Highlight active status pill
+  document.querySelectorAll('#status-pills-bar .filter-btn').forEach(b => b.classList.remove('active'));
+  const statusBtnMap = {
     'all': 'filter-btn-all',
     'open': 'filter-btn-open',
-    'mainboard': 'filter-btn-main',
-    'sme': 'filter-btn-sme',
+    'closing': 'filter-btn-closing',
     'high-gmp': 'filter-btn-high-gmp'
   };
-  const activeBtn = document.getElementById(btnMap[filter]);
-  if (activeBtn) {
-    activeBtn.classList.add('active');
-  }
+  const activeStatusBtn = document.getElementById(statusBtnMap[currentStatusFilter]);
+  if (activeStatusBtn) activeStatusBtn.classList.add('active');
 
+  // Highlight active board pill
+  document.querySelectorAll('#board-pills-bar .filter-btn').forEach(b => b.classList.remove('active'));
+  const boardBtnMap = {
+    'all': 'filter-btn-board-all',
+    'mainboard': 'filter-btn-main',
+    'sme': 'filter-btn-sme'
+  };
+  const activeBoardBtn = document.getElementById(boardBtnMap[currentBoardFilter]);
+  if (activeBoardBtn) activeBoardBtn.classList.add('active');
+}
+
+function setStatusFilter(status) {
+  currentStatusFilter = status;
+  updateFilterUI();
+  updateFilterCounts();
   renderIposTable();
+}
+
+function setBoardFilter(board) {
+  currentBoardFilter = board;
+  updateFilterUI();
+  renderIposTable();
+}
+
+function setTableFilter(filter) {
+  if (['all', 'open', 'closing', 'high-gmp'].includes(filter)) {
+    setStatusFilter(filter);
+  } else if (['mainboard', 'sme'].includes(filter)) {
+    setBoardFilter(filter);
+  }
 }
 
 function parseDateForSort(displayVal, isoVal) {
@@ -305,30 +361,32 @@ function renderIposTable() {
   const tbody = document.getElementById('ipos-table-body');
   const thresh = parseFloat(currentSettings.gmp_threshold || 15.0);
 
-  // 1. Primary Filter
-  let filtered = allIpos;
-  let filterName = 'All';
-  if (currentFilter === 'open') {
-    filtered = allIpos.filter(i => i.is_open);
-    filterName = 'Open';
-  } else if (currentFilter === 'mainboard') {
-    filtered = allIpos.filter(i => (i.category || '').toUpperCase() !== 'SME');
-    filterName = 'Mainboard';
-  } else if (currentFilter === 'sme') {
-    filtered = allIpos.filter(i => (i.category || '').toUpperCase() === 'SME');
-    filterName = 'SME';
-  } else if (currentFilter === 'high-gmp') {
-    filtered = allIpos.filter(i => i.is_open && i.gmp_percent >= thresh);
-    filterName = 'High GMP (>15%)';
-  }
+  // 1. Status Filter
+  let filtered = allIpos.filter(i => matchesStatus(i, currentStatusFilter, thresh));
 
-  // 2. Layered Filter: Hide Closed & Past Listed IPOs
+  // 2. Board Filter
+  filtered = filtered.filter(i => matchesBoard(i, currentBoardFilter));
+
+  // 3. Layered Filter: Hide Closed & Past Listed IPOs
   let hiddenInView = 0;
   if (hideClosedAndPast) {
     const beforeCount = filtered.length;
     filtered = filtered.filter(i => !isClosedOrPast(i));
     hiddenInView = beforeCount - filtered.length;
   }
+
+  const statusLabels = {
+    'all': 'All Statuses',
+    'open': 'Open',
+    'closing': 'Ending Today',
+    'high-gmp': 'High GMP (>15%)'
+  };
+  const boardLabels = {
+    'all': 'All Boards',
+    'mainboard': 'Mainboard',
+    'sme': 'SME'
+  };
+  const filterDesc = `${statusLabels[currentStatusFilter] || currentStatusFilter} > ${boardLabels[currentBoardFilter] || currentBoardFilter}`;
 
   // Update feedback text
   const feedbackEl = document.getElementById('filter-feedback-text');
@@ -337,16 +395,16 @@ function renderIposTable() {
     const extraNote = hideClosedAndPast
       ? ` • <span style="color: #fca5a5; font-weight: 600;">🚫 ${hiddenInView} Closed / Past Listed hidden</span>`
       : '';
-    feedbackEl.innerHTML = `Showing <b>${filtered.length}</b> ${filterName} IPOs (Sorted by <b>${colLabel}</b> ${sortDirection.toUpperCase()})${extraNote}`;
+    feedbackEl.innerHTML = `Showing <b>${filtered.length}</b> IPOs (${filterDesc} • Sorted by <b>${colLabel}</b> ${sortDirection.toUpperCase()})${extraNote}`;
   }
 
   const cardsContainer = document.getElementById('ipos-cards-container');
 
   if (filtered.length === 0) {
     const reason = hideClosedAndPast ? ` (Closed &amp; Past Listed are hidden)` : '';
-    tbody.innerHTML = `<tr><td colspan="7" class="empty-state">No IPOs match the current filter: <b>${filterName}</b>${reason}.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-state">No IPOs match the current filters: <b>${filterDesc}</b>${reason}.</td></tr>`;
     if (cardsContainer) {
-      cardsContainer.innerHTML = `<div class="empty-state">No IPOs match the current filter: <b>${filterName}</b>${reason}.</div>`;
+      cardsContainer.innerHTML = `<div class="empty-state">No IPOs match the current filters: <b>${filterDesc}</b>${reason}.</div>`;
     }
     return;
   }
@@ -386,8 +444,13 @@ function renderIposTable() {
     const catBadge = isSme ? `<span class="badge badge-sme">SME</span>` : `<span class="badge badge-main">Main</span>`;
     
     let statusBadge = `<span class="badge badge-closed">${ipo.status}</span>`;
-    if (ipo.is_open) statusBadge = `<span class="badge badge-open">🟢 OPEN</span>`;
-    else if (ipo.status === 'UPCOMING') statusBadge = `<span class="badge badge-upcoming">UPCOMING</span>`;
+    if (isClosingToday(ipo)) {
+      statusBadge = `<span class="badge badge-closing-today">⏳ CLOSES TODAY</span>`;
+    } else if (ipo.is_open) {
+      statusBadge = `<span class="badge badge-open">🟢 OPEN</span>`;
+    } else if (ipo.status === 'UPCOMING') {
+      statusBadge = `<span class="badge badge-upcoming">UPCOMING</span>`;
+    }
 
     const gmpHighlight = ipo.gmp_percent >= thresh ? 'badge-gmp-high' : '';
     const gmpPill = `<span class="badge ${gmpHighlight}">${ipo.gmp_val} (+${ipo.gmp_percent}%)</span>`;
@@ -443,8 +506,13 @@ function renderIposTable() {
       const catBadge = isSme ? `<span class="badge badge-sme">SME</span>` : `<span class="badge badge-main">Main</span>`;
       
       let statusBadge = `<span class="badge badge-closed">${ipo.status}</span>`;
-      if (ipo.is_open) statusBadge = `<span class="badge badge-open">🟢 OPEN</span>`;
-      else if (ipo.status === 'UPCOMING') statusBadge = `<span class="badge badge-upcoming">UPCOMING</span>`;
+      if (isClosingToday(ipo)) {
+        statusBadge = `<span class="badge badge-closing-today">⏳ CLOSES TODAY</span>`;
+      } else if (ipo.is_open) {
+        statusBadge = `<span class="badge badge-open">🟢 OPEN</span>`;
+      } else if (ipo.status === 'UPCOMING') {
+        statusBadge = `<span class="badge badge-upcoming">UPCOMING</span>`;
+      }
 
       const isHighGmp = ipo.gmp_percent >= thresh;
       const gmpHighlight = isHighGmp ? 'badge-gmp-high' : '';

@@ -4,6 +4,7 @@ import re
 import html
 import math
 from datetime import datetime
+import pytz
 from typing import List, Dict, Any, Optional
 
 class InvestorGainScraper:
@@ -93,17 +94,6 @@ class InvestorGainScraper:
             if not name or name == "Unknown":
                 return None
 
-            status_code = gmp_item.get("~ipo_status1", "").upper()
-            status_map = {
-                "O": "OPEN",
-                "U": "UPCOMING",
-                "C": "CLOSED",
-                "LN": "LISTED_NEW",
-                "LP": "LISTED_PAST"
-            }
-            status = status_map.get(status_code, status_code or "UNKNOWN")
-            is_open = (status_code == "O")
-
             category = gmp_item.get("~IPO_Category") or gmp_item.get("~ipo_category1") or "Mainboard"
 
             # Dates
@@ -116,6 +106,47 @@ class InvestorGainScraper:
             end_date = self._clean_html(str(raw_end)).split("\n")[0].split("GMP:")[0].strip()
             start_date_sort = str(gmp_item.get("~Srt_Open") or "").strip()
             end_date_sort = str(gmp_item.get("~Srt_Close") or "").strip()
+
+            # Current date and time in IST
+            try:
+                now_ist = datetime.now(pytz.timezone("Asia/Kolkata"))
+            except Exception:
+                now_ist = datetime.now()
+            today_ist = now_ist.strftime("%Y-%m-%d")
+
+            status_code = gmp_item.get("~ipo_status1", "").upper()
+            status_map = {
+                "O": "OPEN",
+                "CT": "CLOSING_TODAY",
+                "U": "UPCOMING",
+                "C": "CLOSED",
+                "LN": "LISTED_NEW",
+                "LP": "LISTED_PAST"
+            }
+
+            # Check if closing today
+            is_closing_date = (end_date_sort == today_ist)
+            is_closing_today = (status_code == "CT") or is_closing_date
+
+            if status_code == "CT":
+                status = "CLOSING_TODAY"
+                is_open = True
+                is_closing_today = True
+            elif status_code == "O":
+                if is_closing_date:
+                    status = "CLOSING_TODAY"
+                    is_closing_today = True
+                else:
+                    status = "OPEN"
+                is_open = True
+            elif status_code == "C" and is_closing_date and now_ist.hour < 17:
+                # Market bidding is still active on closing date before 5 PM IST cutoff
+                status = "CLOSING_TODAY"
+                is_open = True
+                is_closing_today = True
+            else:
+                status = status_map.get(status_code, status_code or "UNKNOWN")
+                is_open = False
 
             # GMP Extraction
             gmp_raw = gmp_item.get("GMP", "")
@@ -186,6 +217,7 @@ class InvestorGainScraper:
                 "category": category,
                 "status": status,
                 "is_open": is_open,
+                "is_closing_today": is_closing_today,
                 "start_date": start_date,
                 "end_date": end_date,
                 "start_date_sort": start_date_sort,

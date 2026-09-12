@@ -87,10 +87,15 @@ class TelegramClient:
 
         # Visual indicator
         fire = "🔥" if gmp_pct >= 25 else "⚡"
+        is_closing = ipo.get("is_closing_today", False)
+        
+        header_title = f"⏳ <b>CLOSING TODAY ALERT: {name}</b> {fire}" if is_closing else f"🚀 <b>HIGH GMP ALERT: {name}</b> {fire}"
+        urgency_note = "⚠️ <b>FINAL DAY: Bidding closes today at 5:00 PM IST!</b>\n━━━━━━━━━━━━━━━━━━━━\n" if is_closing else ""
         
         html_msg = (
-            f"🚀 <b>HIGH GMP ALERT: {name}</b> {fire}\n"
+            f"{header_title}\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"{urgency_note}"
             f"📊 <b>Key Highlights:</b>\n"
             f"• <b>Category:</b> {cat} IPO\n"
             f"• <b>GMP:</b> {gmp_val} (<b>+{gmp_pct}%</b>)\n"

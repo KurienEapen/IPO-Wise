@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ base_path }}/static/style.css?v=2.4">
+  <link rel="stylesheet" href="{{ base_path }}/static/style.css?v=3.2">
   <script>window.BASE_PATH = "{{ base_path }}";</script>
 </head>
 <body>
@@ -93,27 +93,47 @@
         <!-- TAB 1: Live Market Explorer -->
         <div id="tab-market" class="tab-content">
           <div class="filter-controls-header">
-            <div class="filter-pills-bar">
-              <button id="filter-btn-all" class="filter-btn" onclick="setTableFilter('all')">
-                Show All <span class="filter-count" id="count-all">0</span>
-              </button>
-              <button id="filter-btn-open" class="filter-btn active" onclick="setTableFilter('open')">
-                🟢 Open <span class="filter-count" id="count-open">0</span>
-              </button>
-              <button id="filter-btn-main" class="filter-btn" onclick="setTableFilter('mainboard')">
-                🏢 Main <span class="filter-count" id="count-main">0</span>
-              </button>
-              <button id="filter-btn-sme" class="filter-btn" onclick="setTableFilter('sme')">
-                ⚡ SME <span class="filter-count" id="count-sme">0</span>
-              </button>
-              <button id="filter-btn-high-gmp" class="filter-btn" onclick="setTableFilter('high-gmp')">
-                🔥 High GMP <span class="filter-count" id="count-high-gmp">0</span>
-              </button>
+            <div class="filter-groups-stack">
+              <!-- Group 1: Availability / Status Filter -->
+              <div class="filter-group">
+                <span class="filter-group-label">Status:</span>
+                <div class="filter-pills-bar" id="status-pills-bar">
+                  <button id="filter-btn-all" class="filter-btn" onclick="setStatusFilter('all')">
+                    All <span class="filter-count" id="count-all">0</span>
+                  </button>
+                  <button id="filter-btn-open" class="filter-btn active" onclick="setStatusFilter('open')">
+                    🟢 Open <span class="filter-count" id="count-open">0</span>
+                  </button>
+                  <button id="filter-btn-closing" class="filter-btn" onclick="setStatusFilter('closing')">
+                    ⏳ Ending Today <span class="filter-count" id="count-closing">0</span>
+                  </button>
+                  <button id="filter-btn-high-gmp" class="filter-btn" onclick="setStatusFilter('high-gmp')">
+                    🔥 High GMP <span class="filter-count" id="count-high-gmp">0</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Group 2: Board / Category Filter (Stackable) -->
+              <div class="filter-group">
+                <span class="filter-group-label">Board:</span>
+                <div class="filter-pills-bar filter-board-bar" id="board-pills-bar">
+                  <button id="filter-btn-board-all" class="filter-btn active" onclick="setBoardFilter('all')">
+                    All Boards <span class="filter-count" id="count-board-all">0</span>
+                  </button>
+                  <button id="filter-btn-main" class="filter-btn" onclick="setBoardFilter('mainboard')">
+                    🏢 Mainboard <span class="filter-count" id="count-main">0</span>
+                  </button>
+                  <button id="filter-btn-sme" class="filter-btn" onclick="setBoardFilter('sme')">
+                    ⚡ SME <span class="filter-count" id="count-sme">0</span>
+                  </button>
+                </div>
+              </div>
             </div>
+
             <div class="filter-controls-extra">
               <button type="button" id="btn-hide-closed" class="filter-toggle-btn" onclick="toggleHideClosed()" title="Click to hide or show Closed and Past Listed IPOs">
                 <span id="hide-closed-icon">👁️</span>
-                <span id="hide-closed-text">Hide Closed / Listed Past</span>
+                <span id="hide-closed-text">Hide Closed / Past</span>
                 <span id="hide-closed-count" class="filter-count">0</span>
               </button>
               <div style="font-size: 11.5px; color: var(--text-dim);" id="market-update-stamp">
@@ -303,6 +323,6 @@
   <!-- Toast Container -->
   <div id="toast-container"></div>
 
-  <script src="{{ base_path }}/static/app.js?v=2.4"></script>
+  <script src="{{ base_path }}/static/app.js?v=3.2"></script>
 </body>
 </html>

@@ -667,6 +667,24 @@ tr:hover td {
   padding: 4px 10px;
 }
 
+.badge-closing-today {
+  background: rgba(245, 158, 11, 0.22);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.2);
+  font-weight: 700;
+  animation: pulse-closing 2.2s infinite ease-in-out;
+}
+
+@keyframes pulse-closing {
+  0%, 100% {
+    box-shadow: 0 0 6px rgba(245, 158, 11, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 14px rgba(245, 158, 11, 0.45);
+  }
+}
+
 .badge-muted {
   background: rgba(244, 63, 94, 0.15);
   color: #fb7185;
@@ -769,10 +787,39 @@ tr:hover td {
 .filter-controls-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 14px;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 14px;
+}
+
+.filter-groups-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.filter-group-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-dim);
+  min-width: 52px;
+}
+
+.filter-board-bar .filter-btn.active {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.4), rgba(6, 182, 212, 0.35));
+  border-color: #a855f7;
+  box-shadow: 0 0 16px rgba(168, 85, 247, 0.35), 0 2px 6px rgba(0, 0, 0, 0.4);
 }
 
 .filter-controls-extra {
@@ -780,6 +827,7 @@ tr:hover td {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+  margin-top: 4px;
 }
 
 .filter-breadcrumb-bar {
