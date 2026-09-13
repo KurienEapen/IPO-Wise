@@ -109,6 +109,13 @@ class TelegramClient:
         retail_order = ipo.get("retail_min_order", "1 Lot")
         shni_order = ipo.get("shni_min_order") or ipo.get("hni_min_order", "2 Lots")
 
+        # Strip commas and wrap shares in <code> for native 1-tap copy to clipboard in Telegram (ready for broker apps)
+        def make_copyable_shares(order_str: str) -> str:
+            return re.sub(r"\((\d[\d,]*)\)", lambda m: f"(<code>{m.group(1).replace(',', '')}</code>)", str(order_str))
+
+        retail_order_html = make_copyable_shares(retail_order)
+        shni_order_html = make_copyable_shares(shni_order)
+
         is_closing = bool(ipo.get("is_closing_today") or str(ipo.get("status", "")).upper() == "CLOSING_TODAY")
         if not is_closing:
             try:
@@ -135,8 +142,8 @@ class TelegramClient:
             f"• Retail: {retail}\n"
             f"• Total: {total}\n\n"
             f"<b>Investment</b>\n"
-            f"• Retail: {retail_order}\n"
-            f"• sHNI: {shni_order}"
+            f"• Retail: {retail_order_html}\n"
+            f"• sHNI: {shni_order_html}"
         )
 
         if not include_buttons:
@@ -173,10 +180,40 @@ class TelegramClient:
         }
         cal_url = "https://calendar.google.com/calendar/render?" + urllib.parse.urlencode(cal_params)
 
+        # Extract raw quantities for bridge page 1-tap copy
+        retail_qty_match = re.search(r"\((\d[\d,]*)\)", retail_order)
+        shni_qty_match = re.search(r"\((\d[\d,]*)\)", shni_order)
+        retail_num = retail_qty_match.group(1).replace(",", "") if retail_qty_match else ""
+        shni_num = shni_qty_match.group(1).replace(",", "") if shni_qty_match else ""
+
         # Telegram callback_data limit is 64 bytes
         cb_name = name[:30].replace(":", "")
+        try:
+            from config import config
+            bridge_base = config.bid_bridge_url
+        except Exception:
+            bridge_base = ""
+
+        if bridge_base:
+            bid_params = urllib.parse.urlencode({
+                "name": name,
+                "category": cat_disp,
+                "price": price,
+                "retail_qty": retail_num,
+                "shni_qty": shni_num
+            })
+            bid_url = f"{bridge_base}?{bid_params}"
+        else:
+            bid_url = "https://kite.zerodha.com/bids/ipo"
+
         reply_markup = {
             "inline_keyboard": [
+                [
+                    {
+                        "text": "⚡ Place Bid",
+                        "url": bid_url
+                    }
+                ],
                 [
                     {
                         "text": "Mute",

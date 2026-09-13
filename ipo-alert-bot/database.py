@@ -66,6 +66,7 @@ def init_db():
         status TEXT NOT NULL DEFAULT 'pending', -- 'pending', 'approved', 'rejected', 'unsubscribed'
         gmp_threshold REAL DEFAULT NULL,
         enable_sme INTEGER DEFAULT 0,
+        only_closing_day INTEGER DEFAULT 0,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
     )
@@ -76,6 +77,8 @@ def init_db():
         cursor.execute("ALTER TABLE subscribers ADD COLUMN gmp_threshold REAL DEFAULT NULL")
     if sub_cols and "enable_sme" not in sub_cols:
         cursor.execute("ALTER TABLE subscribers ADD COLUMN enable_sme INTEGER DEFAULT 0")
+    if sub_cols and "only_closing_day" not in sub_cols:
+        cursor.execute("ALTER TABLE subscribers ADD COLUMN only_closing_day INTEGER DEFAULT 0")
     
     # Table for dispatch alert logs
     cursor.execute("""
@@ -113,6 +116,7 @@ def init_db():
         "enable_sme_alerts": "1",
         "schedule_times": "10:00,12:30,15:30",
         "timezone": "Asia/Kolkata",
+        "public_url": "",
         "last_check_at": "",
         "last_check_status": "Idle",
         "admin_username": "admin"
@@ -328,6 +332,19 @@ def set_subscriber_sme(chat_id: str, enable_sme: bool) -> bool:
     cursor = conn.cursor()
     try:
         cursor.execute("UPDATE subscribers SET enable_sme = ?, updated_at = ? WHERE chat_id = ?", (val, now_str, cid))
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
+
+def set_subscriber_closing_day(chat_id: str, only_closing_day: bool) -> bool:
+    cid = str(chat_id).strip()
+    val = 1 if only_closing_day else 0
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("UPDATE subscribers SET only_closing_day = ?, updated_at = ? WHERE chat_id = ?", (val, now_str, cid))
         conn.commit()
         return cursor.rowcount > 0
     finally:

@@ -92,6 +92,7 @@ async function loadSettings() {
 
     document.getElementById('input-bot-token').value = currentSettings.bot_token || '';
     document.getElementById('input-chat-id').value = currentSettings.chat_id || '';
+    document.getElementById('input-public-url').value = currentSettings.public_url || '';
     
     const thresh = currentSettings.gmp_threshold || '15';
     document.getElementById('input-gmp-threshold').value = thresh;
@@ -169,6 +170,7 @@ async function saveSettings() {
   const chatId = document.getElementById('input-chat-id').value.trim();
   const threshold = document.getElementById('input-gmp-threshold').value;
   const scheduleTimes = document.getElementById('input-schedule-times').value.trim();
+  const publicUrl = document.getElementById('input-public-url').value.trim();
 
   try {
     const res = await fetch(`${BASE_PATH}/api/settings`, {
@@ -179,6 +181,7 @@ async function saveSettings() {
         enable_sme_alerts: enableSme,
         bot_token: token,
         chat_id: chatId,
+        public_url: publicUrl,
         gmp_threshold: threshold,
         schedule_times: scheduleTimes
       })

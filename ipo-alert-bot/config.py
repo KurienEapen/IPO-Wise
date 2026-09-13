@@ -50,4 +50,42 @@ class AppConfig:
     def timezone(self) -> str:
         return self.get("timezone", "Asia/Kolkata")
 
+    @property
+    def public_url(self) -> str:
+        val = os.environ.get("PUBLIC_URL") or self.get("public_url", "")
+        if val:
+            return val.rstrip("/")
+        # Auto-detect local IP if running locally
+        try:
+            import socket
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            s.close()
+            port = os.environ.get("PORT", "5050")
+            base = os.environ.get("BASE_PATH", "").rstrip("/")
+            return f"http://{ip}:{port}{base}"
+        except Exception:
+            return ""
+
+    @property
+    def bid_bridge_url(self) -> str:
+        # Only route Telegram alerts through the bridge if an explicit public_url is configured.
+        # Otherwise, fallback to direct broker URL so alerts never break with unroutable private IPs.
+        val = os.environ.get("PUBLIC_URL") or self.get("public_url", "")
+        if not val:
+            return ""
+        val = val.rstrip("/")
+        base_subpath = os.environ.get("BASE_PATH", "").strip("/")
+        if base_subpath and not val.endswith(f"/{base_subpath}"):
+            val = f"{val}/{base_subpath}"
+        return f"{val}/place-bid"
+
+    @property
+    def kite_bridge_url(self) -> str:
+        bridge = self.bid_bridge_url
+        if bridge:
+            return bridge
+        return "https://kite.zerodha.com/bids/ipo"
+
 config = AppConfig()

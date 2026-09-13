@@ -1,0 +1,234 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-13T14:47:45Z",
+  "title": "Design System: IPO-Wise",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Hyper Indigo",
+        "canonical": "#6366f1",
+        "tonalRamp": ["#1e1b4b", "#312e81", "#3730a3", "#4338ca", "#4f46e5", "#6366f1", "#818cf8", "#c7d2fe"]
+      },
+      "emerald": {
+        "role": "secondary",
+        "displayName": "Signal Emerald",
+        "canonical": "#10b981",
+        "tonalRamp": ["#022c22", "#064e3b", "#065f46", "#047857", "#059669", "#10b981", "#34d399", "#a7f3d0"]
+      },
+      "cyan": {
+        "role": "secondary",
+        "displayName": "Telemetry Cyan",
+        "canonical": "#06b6d4",
+        "tonalRamp": ["#083344", "#164e63", "#155e75", "#0e7490", "#0891b2", "#06b6d4", "#22d3ee", "#a5f3fc"]
+      },
+      "amber": {
+        "role": "tertiary",
+        "displayName": "Alert Amber",
+        "canonical": "#f59e0b",
+        "tonalRamp": ["#451a03", "#78350f", "#92400e", "#b45309", "#d97706", "#f59e0b", "#fbbf24", "#fde68a"]
+      },
+      "rose": {
+        "role": "tertiary",
+        "displayName": "Risk Rose",
+        "canonical": "#f43f5e",
+        "tonalRamp": ["#4c0519", "#881337", "#9f1239", "#be123c", "#e11d48", "#f43f5e", "#fb7185", "#fecdd3"]
+      },
+      "neutral-bg": {
+        "role": "neutral",
+        "displayName": "Obsidian Void",
+        "canonical": "#07090e",
+        "tonalRamp": ["#030507", "#07090e", "#0d1320", "#111827", "#1e293b", "#334155", "#64748b", "#cbd5e1"]
+      },
+      "neutral-card": {
+        "role": "neutral",
+        "displayName": "Deep Slate Glass",
+        "canonical": "rgba(17, 24, 39, 0.75)",
+        "tonalRamp": ["#050810", "#0b101b", "#111827", "#1f2937", "#374151", "#4b5563", "#9ca3af", "#e5e7eb"]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Console header and brand title."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "KPI metrics and numerical stats on dashboard cards."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Panel headers and section dividers."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Standard table rows, descriptions, and input field values."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Input labels, status badges, and table column headers."
+      }
+    },
+    "shadows": [
+      {
+        "name": "panel-rest",
+        "value": "0 10px 30px rgba(0, 0, 0, 0.25)",
+        "purpose": "Standard grounding depth for frosted glass panels."
+      },
+      {
+        "name": "card-hover",
+        "value": "0 8px 24px rgba(0, 0, 0, 0.3)",
+        "purpose": "Elevated hover state for stat cards and list elements."
+      },
+      {
+        "name": "primary-glow",
+        "value": "0 4px 15px rgba(99, 102, 241, 0.25)",
+        "purpose": "Ambient aura around primary actions and active states."
+      },
+      {
+        "name": "emerald-glow",
+        "value": "0 4px 15px rgba(16, 185, 129, 0.2)",
+        "purpose": "Telemetry aura around live check buttons and positive statuses."
+      }
+    ],
+    "motion": [
+      {
+        "name": "transition-standard",
+        "value": "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+        "purpose": "Default easing curve for buttons, cards, and input focus transitions."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "980px"
+      },
+      {
+        "name": "xl",
+        "value": "1280px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Main interactive call to action for saving configuration and confirming actions.",
+      "html": "<button class=\"ds-btn-primary\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z\"/><polyline points=\"17 21 17 13 7 13 7 21\"/><polyline points=\"7 3 7 8 15 8\"/></svg> Save Settings</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: linear-gradient(135deg, #6366f1, #4f46e5); color: #ffffff; padding: 10px 18px; border-radius: 10px; font-family: 'Inter', -apple-system, sans-serif; font-size: 13.5px; font-weight: 600; cursor: pointer; border: 1px solid transparent; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.25); transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); } .ds-btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }"
+    },
+    {
+      "name": "Emerald Action Button",
+      "kind": "button",
+      "refersTo": "button-emerald",
+      "description": "High-conviction instant action button for live scraper triggers.",
+      "html": "<button class=\"ds-btn-emerald\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><polygon points=\"13 2 3 14 12 14 11 22 21 10 12 10 13 2\"/></svg> Check Now</button>",
+      "css": ".ds-btn-emerald { display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: linear-gradient(135deg, #10b981, #059669); color: #ffffff; padding: 10px 18px; border-radius: 10px; font-family: 'Inter', -apple-system, sans-serif; font-size: 13.5px; font-weight: 600; cursor: pointer; border: 1px solid transparent; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.2); transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); } .ds-btn-emerald:hover { filter: brightness(1.1); transform: translateY(-1px); }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Neutral secondary button for ancillary actions and dismissal.",
+      "html": "<button class=\"ds-btn-secondary\">Cancel</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: rgba(255, 255, 255, 0.05); color: #f8fafc; border: 1px solid rgba(255, 255, 255, 0.08); padding: 10px 18px; border-radius: 10px; font-family: 'Inter', -apple-system, sans-serif; font-size: 13.5px; font-weight: 600; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); } .ds-btn-secondary:hover { background: rgba(255, 255, 255, 0.1); }"
+    },
+    {
+      "name": "Active Status Pill",
+      "kind": "chip",
+      "refersTo": "status-pill",
+      "description": "Pulsing live status indicator badge for bot runtime and background scheduler.",
+      "html": "<span class=\"ds-status-pill active\"><span class=\"ds-status-dot\"></span> System Active</span>",
+      "css": ".ds-status-pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 30px; font-size: 12px; font-weight: 600; font-family: 'Inter', -apple-system, sans-serif; backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.08); background: rgba(17, 24, 39, 0.6); color: #f8fafc; } .ds-status-dot { width: 8px; height: 8px; border-radius: 50%; background: #10b981; box-shadow: 0 0 10px #10b981; }"
+    },
+    {
+      "name": "Custom Input Field",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "High-density form input with icon container and glowing focus ring.",
+      "html": "<div class=\"ds-input-container\"><svg class=\"ds-input-icon\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z\"/></svg><input type=\"text\" class=\"ds-custom-input\" placeholder=\"Enter Telegram Chat ID\" value=\"-10019827384\"></div>",
+      "css": ".ds-input-container { position: relative; display: flex; align-items: center; width: 100%; } .ds-input-icon { position: absolute; left: 12px; color: #64748b; pointer-events: none; } .ds-custom-input { width: 100%; background: rgba(13, 19, 32, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 10px 14px 10px 38px; color: #f8fafc; font-family: 'Inter', -apple-system, sans-serif; font-size: 13.5px; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); outline: none; } .ds-custom-input:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25); }"
+    },
+    {
+      "name": "Glass Panel Container",
+      "kind": "card",
+      "refersTo": "card-glass",
+      "description": "Translucent frosted glass panel with subtle hairline border for grouping telemetry and controls.",
+      "html": "<div class=\"ds-glass-panel\"><div class=\"ds-panel-header\"><h3 class=\"ds-panel-title\">System Telemetry</h3></div><p class=\"ds-panel-body\">Monitoring 14 Mainboard and 8 SME IPOs across national exchanges.</p></div>",
+      "css": ".ds-glass-panel { background: rgba(17, 24, 39, 0.75); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; padding: 24px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25); font-family: 'Inter', -apple-system, sans-serif; } .ds-panel-header { margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); } .ds-panel-title { font-family: 'Outfit', -apple-system, sans-serif; font-size: 17px; font-weight: 600; color: #f8fafc; } .ds-panel-body { font-size: 13.5px; color: #94a3b8; line-height: 1.5; }"
+    },
+    {
+      "name": "Quick Stat Card",
+      "kind": "card",
+      "refersTo": "stat-card",
+      "description": "Metric summary tile displaying numerical KPIs with tactile hover elevation.",
+      "html": "<div class=\"ds-stat-card\"><div class=\"ds-stat-icon\">🚀</div><div class=\"ds-stat-info\"><h3>High GMP IPOs</h3><p>5</p></div></div>",
+      "css": ".ds-stat-card { background: rgba(17, 24, 39, 0.75); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; padding: 18px 20px; display: flex; align-items: center; gap: 16px; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); font-family: 'Inter', -apple-system, sans-serif; } .ds-stat-card:hover { transform: translateY(-2px); border-color: rgba(255, 255, 255, 0.15); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); } .ds-stat-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.2); } .ds-stat-info h3 { font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; } .ds-stat-info p { font-family: 'Outfit', -apple-system, sans-serif; font-size: 24px; font-weight: 700; color: #f8fafc; margin-top: 2px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The High-Conviction Terminal",
+    "overview": "IPO-Wise is crafted as a precision dark financial cockpit engineered for rapid decision-making in high-frequency IPO bidding environments. It rejects decorative chart ornaments and generic dashboard bloat in favor of tactical signal density: deep OLED space foundations, frosted glass telemetry panels, and high-contrast metric badges that instantly communicate value, category, and risk.\n\nThe visual atmosphere balances the seriousness of institutional capital allocation with the fluid agility of consumer fintech. Ambient radial glows drift behind structural containers, signaling an active, live-connected pipeline without competing with typographic legibility. Every metric—from ₹ cutoffs to GMP multipliers—is rendered with razor-sharp tabular precision.",
+    "keyCharacteristics": [
+      "Obsidian Space Canvas: Pure deep dark foundation (#07090e) with fixed, luminous radial gradient backdrops (Indigo, Cyan, Emerald).",
+      "Frosted Glass Telemetry: Multi-layer translucent cards (rgba(17, 24, 39, 0.75)) backed by backdrop-filter: blur(16px) and hairline borders (rgba(255, 255, 255, 0.08)).",
+      "Signal-to-Ink Discipline: High-saturation chromatic accents are strictly reserved for actionable signals (GMP > 15%, live status, primary dispatch triggers).",
+      "Tactile Micro-Elevations: Subtle interactive hover responses (translateY(-2px)) accented by diffuse ambient shadow glows."
+    ],
+    "rules": [
+      {
+        "name": "The Signal-to-Ink Rule",
+        "body": "Chromatic color is strictly reserved for financial telemetry, status indicators, and primary triggers. Structural cards, toolbars, and content backgrounds must remain neutral dark glass. Never apply saturated background fills to full cards.",
+        "section": "colors"
+      },
+      {
+        "name": "The Contrast Floor Rule",
+        "body": "All numerical metric values and status labels must achieve a minimum 7:1 contrast ratio against their glass surface backgrounds to guarantee instant scanability in fast-moving market sessions.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tabular Number Rule",
+        "body": "All monetary figures (₹), share quantities, lot counts, and GMP percentages must render using tabular alignment to ensure clean vertical scanning across rows.",
+        "section": "typography"
+      },
+      {
+        "name": "The Uppercase Label Doctrine",
+        "body": "Micro-metadata, form labels, and status badges must be styled in uppercase with positive letter-spacing (0.5px) to establish distinct visual hierarchy against body text.",
+        "section": "typography"
+      },
+      {
+        "name": "The Glass Horizon Rule",
+        "body": "Panels float above ambient radial gradients using backdrop-filter: blur(16px) and translucent fills (rgba(17, 24, 39, 0.75)). Structural surfaces must never be completely opaque.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Glowing Intent Rule",
+        "body": "Shadow glows are active responses to state. Never apply colored glows to inert or disabled interface elements.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do preserve the fixed ambient radial gradients on the canvas background to give depth to frosted glass panels.",
+      "Do format all currency and lot numbers with exact monetary symbols (₹) and commas for rapid cognitive scanning.",
+      "Do render GMP percentage values with color-coded conviction badges: Signal Emerald for >= 15%, Alert Amber for < 15%, and Risk Rose for negative/nil.",
+      "Do use backdrop-filter: blur(16px) on elevated panels and modals.",
+      "Do pair all primary interactive actions with their respective luminous shadow glow tokens."
+    ],
+    "donts": [
+      "Don't use solid opaque gray or white card backgrounds that eliminate the subtle glassmorphic depth.",
+      "Don't introduce generic primary blue (#0000ff) or basic bootstrap colors; adhere strictly to Hyper Indigo, Signal Emerald, Telemetry Cyan, Alert Amber, and Risk Rose.",
+      "Don't use serif typography or decorative script fonts anywhere in the application.",
+      "Don't use harsh 1px solid #ffffff borders; keep all container borders at rgba(255, 255, 255, 0.08).",
+      "Don't clutter data table cells with unnecessary icons or unformatted raw numbers."
+    ]
+  }
+}

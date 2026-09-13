@@ -30,6 +30,34 @@ function showToast(message, type = 'info') {
   }, 4000);
 }
 
+function copyQty(e, qty) {
+  if (e) e.stopPropagation();
+  if (!qty) return;
+  navigator.clipboard.writeText(qty).then(() => {
+    showToast(`Copied ${qty} shares to clipboard!`, 'success');
+  }).catch(() => {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = qty;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      showToast(`Copied ${qty} shares to clipboard!`, 'success');
+    } catch (err) {
+      showToast(`Shares: ${qty}`, 'info');
+    }
+  });
+}
+
+function formatCopyableShares(orderText) {
+  if (!orderText || orderText === '-') return '-';
+  return String(orderText).replace(/\((\d[\d,]*)\)/g, (match, p1) => {
+    const raw = p1.replace(/,/g, '');
+    return `(<span class="copyable-qty" onclick="copyQty(event, '${raw}')" title="Click to copy ${raw} shares">${raw}</span>)`;
+  });
+}
+
 // Tab Switching
 function switchTab(tabId) {
   currentTab = tabId;
@@ -460,6 +488,15 @@ function renderIposTable() {
       ? `<button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="unmute('${safeName}')">Unmute</button>`
       : `<button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="quickMute('${safeName}', 'APPLIED')">Mute</button>`;
 
+    const bidParams = new URLSearchParams({
+      name: ipo.name || '',
+      category: ipo.category || '',
+      price: ipo.price || '',
+      retail_qty: (ipo.retail_min_order || '').match(/\((\d[\d,]*)\)/)?.[1]?.replace(/,/g, '') || '',
+      shni_qty: (ipo.shni_min_order || ipo.hni_min_order || '').match(/\((\d[\d,]*)\)/)?.[1]?.replace(/,/g, '') || ''
+    }).toString();
+    const bidUrl = `${BASE_PATH}/place-bid?${bidParams}`;
+
     return `
       <tr>
         <td>
@@ -487,11 +524,12 @@ function renderIposTable() {
         </td>
         <td>
           <div style="font-size: 12px;"><b>Price:</b> ${ipo.price}</div>
-          <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;"><b>Retail:</b> ${ipo.retail_min_order}</div>
-          <div style="font-size: 11.5px; color: var(--text-muted);"><b>sHNI:</b> ${ipo.shni_min_order || ipo.hni_min_order || '-'}</div>
+          <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;"><b>Retail:</b> ${formatCopyableShares(ipo.retail_min_order)}</div>
+          <div style="font-size: 11.5px; color: var(--text-muted);"><b>sHNI:</b> ${formatCopyableShares(ipo.shni_min_order || ipo.hni_min_order)}</div>
         </td>
         <td>
           <div style="display: flex; gap: 6px; align-items: center;">
+            <a href="${bidUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="padding: 5px 9px; font-size: 11.5px; text-decoration: none; display: inline-flex; align-items: center; gap: 3px;" title="Open broker bidding options">⚡ Place Bid</a>
             <button type="button" class="btn btn-remind" onclick="openReminder('${safeName}')" title="Set calendar reminder for closing date">⏰ Remind</button>
             ${muteAction}
           </div>
@@ -524,6 +562,15 @@ function renderIposTable() {
         ? `<button class="btn btn-secondary" style="padding: 5px 10px; font-size: 11.5px;" onclick="unmute('${safeName}')">Unmute</button>`
         : `<button class="btn btn-secondary" style="padding: 5px 10px; font-size: 11.5px;" onclick="quickMute('${safeName}', 'APPLIED')">Mute</button>`;
 
+      const cardBidParams = new URLSearchParams({
+        name: ipo.name || '',
+        category: ipo.category || '',
+        price: ipo.price || '',
+        retail_qty: (ipo.retail_min_order || '').match(/\((\d[\d,]*)\)/)?.[1]?.replace(/,/g, '') || '',
+        shni_qty: (ipo.shni_min_order || ipo.hni_min_order || '').match(/\((\d[\d,]*)\)/)?.[1]?.replace(/,/g, '') || ''
+      }).toString();
+      const cardBidUrl = `${BASE_PATH}/place-bid?${cardBidParams}`;
+
       return `
         <div class="ipo-mobile-card ${isHighGmp ? 'card-high-gmp' : ''}">
           <div class="ipo-card-header">
@@ -535,6 +582,7 @@ function renderIposTable() {
               </div>
             </div>
             <div class="ipo-card-actions-group">
+              <a href="${cardBidUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="padding: 5px 9px; font-size: 11.5px; text-decoration: none; display: inline-flex; align-items: center; gap: 3px;" title="Open broker bidding options">⚡ Place Bid</a>
               <button type="button" class="btn btn-remind" onclick="openReminder('${safeName}')" title="Set calendar reminder for closing date">⏰ Remind</button>
               ${muteAction}
             </div>
@@ -567,8 +615,8 @@ function renderIposTable() {
               <span class="detail-col-title">💰 Price &amp; Order</span>
               <div class="detail-col-primary"><b>${ipo.price}</b></div>
               <div class="detail-col-sub" style="margin-top: 3px;">
-                <div>Retail: <b>${ipo.retail_min_order}</b></div>
-                ${(ipo.shni_min_order || ipo.hni_min_order) ? `<div>sHNI: <b>${ipo.shni_min_order || ipo.hni_min_order}</b></div>` : ''}
+                <div>Retail: <b>${formatCopyableShares(ipo.retail_min_order)}</b></div>
+                ${(ipo.shni_min_order || ipo.hni_min_order) ? `<div>sHNI: <b>${formatCopyableShares(ipo.shni_min_order || ipo.hni_min_order)}</b></div>` : ''}
               </div>
             </div>
           </div>

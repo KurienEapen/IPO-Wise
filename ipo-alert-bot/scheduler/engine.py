@@ -173,17 +173,6 @@ class AlertScheduler:
             except Exception as ce:
                 logger.warning(f"Auto-cleanup of closed IPOs encountered an issue: {ce}")
 
-            # 2. Scrape live open IPOs meeting the GMP threshold
-            open_ipos = self.scraper.get_open_ipos_above_gmp(min_gmp)
-            total_open = len(open_ipos)
-            print(f"[AlertScheduler] Scraped market: Found {total_open} open IPO(s) with GMP >= {min_gmp}%.")
-            logger.info(f"Found {total_open} open IPO(s) with GMP >= {min_gmp}%.")
-            
-            alerts_dispatched = 0
-            muted_count = 0
-            sme_skipped_count = 0
-            client = TelegramClient(token) if token else None
-
             # Retrieve active approved private subscribers (if not targeting a single chat override)
             approved_subs = get_approved_subscribers() if not target_chat_override else []
 
@@ -207,6 +196,7 @@ class AlertScheduler:
                 gmp_pct = ipo.get("gmp_percent", 0.0)
                 category = str(ipo.get("category", "")).upper()
                 is_sme = (category == "SME")
+                is_closing = bool(ipo.get("is_closing_today") or str(ipo.get("status", "")).upper() == "CLOSING_TODAY")
 
                 # Prepare formats:
                 # Group format: NO interactive buttons & no mute prompt footer
@@ -225,6 +215,10 @@ class AlertScheduler:
                             continue
                         if target_sub and not bool(target_sub.get("enable_sme", 0)):
                             continue
+
+                    # Closing day check: if subscriber opted for closing day only, skip if not closing today
+                    if target_sub and bool(target_sub.get("only_closing_day", 0)) and not is_closing:
+                        continue
 
                     effective_thresh = float(target_sub["gmp_threshold"]) if (target_sub and target_sub.get("gmp_threshold") is not None) else min_gmp
 
@@ -315,6 +309,10 @@ class AlertScheduler:
                         # Check SME preference for this user (default: Mainboard only)
                         sub_sme = bool(sub.get("enable_sme", 0))
                         if is_sme and not sub_sme:
+                            continue
+                        
+                        # Check Closing Day preference for this user (default: All Days, off)
+                        if bool(sub.get("only_closing_day", 0)) and not is_closing:
                             continue
                         
                         # Check user personal threshold

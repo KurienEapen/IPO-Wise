@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Opening Zerodha Kite — IPO Wise</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ base_path }}/static/style.css?v=3.6">
+  <style>
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px 16px;
+      background: radial-gradient(circle at 50% 20%, rgba(249, 115, 22, 0.12), transparent 70%), var(--bg-main);
+    }
+    .bridge-card {
+      width: 100%;
+      max-width: 440px;
+      background: var(--bg-card);
+      backdrop-filter: blur(24px);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 36px 28px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+      text-align: center;
+      animation: fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .kite-icon-wrapper {
+      width: 76px;
+      height: 76px;
+      background: linear-gradient(135deg, #ea580c, #f97316);
+      border-radius: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 38px;
+      margin: 0 auto 22px auto;
+      box-shadow: 0 12px 35px rgba(234, 88, 12, 0.4);
+      position: relative;
+    }
+    .pulse-ring {
+      position: absolute;
+      top: -6px; left: -6px; right: -6px; bottom: -6px;
+      border: 2px solid rgba(249, 115, 22, 0.4);
+      border-radius: 28px;
+      animation: pulse 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 0.8; }
+      50% { transform: scale(1.08); opacity: 0.2; }
+    }
+    .title {
+      font-family: var(--font-heading);
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      font-size: 13.5px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 26px;
+    }
+    .btn-launch {
+      display: block;
+      width: 100%;
+      background: linear-gradient(135deg, #ea580c, #f97316);
+      color: #ffffff;
+      font-weight: 700;
+      font-size: 15px;
+      padding: 14px 20px;
+      border-radius: var(--radius-md);
+      text-decoration: none;
+      box-shadow: 0 8px 25px rgba(234, 88, 12, 0.35);
+      transition: all 0.2s ease;
+      margin-bottom: 12px;
+      border: none;
+      cursor: pointer;
+    }
+    .btn-launch:active {
+      transform: scale(0.98);
+    }
+    .btn-web {
+      display: inline-block;
+      color: var(--text-muted);
+      font-size: 13px;
+      text-decoration: none;
+      padding: 8px 12px;
+      transition: color 0.15s ease;
+    }
+    .btn-web:hover {
+      color: var(--text-main);
+      text-decoration: underline;
+    }
+    .tip-box {
+      margin-top: 26px;
+      padding: 12px 14px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      font-size: 11.5px;
+      color: var(--text-dim);
+      text-align: left;
+      line-height: 1.5;
+    }
+    .tip-box b {
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="bridge-card">
+    <div class="kite-icon-wrapper">
+      <div class="pulse-ring"></div>
+      ⚡
+    </div>
+
+    <h1 class="title">Opening Zerodha Kite</h1>
+    <p class="subtitle" id="status-msg">
+      Redirecting to the IPO Bids section in your Kite app...
+    </p>
+
+    <a id="launch-btn" href="kite://home" class="btn-launch">
+      ⚡ Open in Kite App
+    </a>
+
+    <div>
+      <a id="web-fallback-link" href="https://kite.zerodha.com/bids/ipo" target="_blank" class="btn-web">
+        🌐 Open on Kite Web instead
+      </a>
+    </div>
+
+    <div class="tip-box">
+      <b>💡 One-Time Tip for Telegram:</b><br>
+      To open the Kite app directly from Telegram buttons in the future:
+      Go to <b>Telegram Settings &gt; Chat Settings</b> and toggle OFF <b>"In-App Browser"</b>.
+    </div>
+  </div>
+
+  <script>
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+    const androidIntent = "intent://home#Intent;scheme=kite;package=com.zerodha.kite3;end";
+    const iosScheme = "kite://home";
+    const webFallback = "https://kite.zerodha.com/bids/ipo";
+
+    // Select the best direct URL for the current platform
+    const directUrl = isAndroid ? androidIntent : (isIOS ? iosScheme : webFallback);
+
+    const launchBtn = document.getElementById('launch-btn');
+    launchBtn.href = directUrl;
+
+    function attemptLaunch() {
+      // In mobile in-app browsers, attempt auto-navigation
+      if (isAndroid) {
+        window.location.href = androidIntent;
+      } else if (isIOS) {
+        window.location.href = iosScheme;
+      }
+    }
+
+    // Auto-launch immediately
+    attemptLaunch();
+
+    // Fallback message update if still on page after 2 seconds
+    setTimeout(() => {
+      const msg = document.getElementById('status-msg');
+      if (msg) {
+        msg.textContent = "Tap the button below to launch the Kite app:";
+      }
+    }, 1800);
+  </script>
+</body>
+</html>

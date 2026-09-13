@@ -14,7 +14,7 @@ from database import (
     verify_admin_login, create_session, validate_session,
     delete_session, set_admin_password,
     get_subscribers, get_subscriber, set_subscriber_status, delete_subscriber,
-    set_subscriber_sme
+    set_subscriber_sme, set_subscriber_closing_day
 )
 from bot.telegram_client import TelegramClient
 from scraper.investorgain import InvestorGainScraper
@@ -115,6 +115,27 @@ async def handle_logout(request: Request):
     response.delete_cookie(key="ipo_session")
     return response
 
+# Public App Bridge for Market Investing Platforms
+@app.get("/place-bid", response_class=HTMLResponse)
+async def place_bid_bridge(request: Request, name: str = "", category: str = "", price: str = "", retail_qty: str = "", shni_qty: str = ""):
+    return templates.TemplateResponse(request=request, name="place_bid.html", context={
+        "base_path": BASE_PATH,
+        "name": name,
+        "category": category,
+        "price": price,
+        "retail_qty": retail_qty,
+        "shni_qty": shni_qty
+    })
+
+# Legacy alias for Kite
+@app.get("/open-kite")
+async def open_kite_bridge(request: Request):
+    target = f"{BASE_PATH}/place-bid" if BASE_PATH else "/place-bid"
+    qs = request.url.query
+    if qs:
+        target = f"{target}?{qs}"
+    return RedirectResponse(url=target, status_code=307)
+
 # Protected UI Dashboard & Settings
 @app.get("/", response_class=HTMLResponse)
 async def get_dashboard(request: Request):
@@ -161,7 +182,7 @@ async def get_schedule_status():
 async def save_settings(data: Dict[str, Any] = Body(...)):
     allowed_keys = [
         "bot_token", "chat_id", "gmp_threshold", "is_enabled",
-        "enable_sme_alerts", "schedule_times", "timezone"
+        "enable_sme_alerts", "schedule_times", "timezone", "public_url"
     ]
     filtered = {k: str(v) for k, v in data.items() if k in allowed_keys}
     update_settings(filtered)
@@ -351,6 +372,21 @@ async def toggle_subscriber_sme(chat_id: str):
     set_subscriber_sme(chat_id, new_sme)
     return {"status": "success", "enable_sme": new_sme, "message": f"SME alerts {'enabled' if new_sme else 'disabled'} for subscriber"}
 
+@app.post("/api/subscribers/{chat_id}/toggle-closing-day", dependencies=[Depends(require_auth)])
+async def toggle_subscriber_closing_day(chat_id: str):
+    sub = get_subscriber(chat_id)
+    if not sub:
+        raise HTTPException(status_code=404, detail="Subscriber not found")
+    
+    current_val = bool(sub.get("only_closing_day", 0))
+    new_val = not current_val
+    set_subscriber_closing_day(chat_id, new_val)
+    return {
+        "status": "success",
+        "only_closing_day": new_val,
+        "message": f"Closing-day-only alerts {'enabled' if new_val else 'disabled'} for subscriber"
+    }
+
 @app.post("/api/subscribers/{chat_id}/test", dependencies=[Depends(require_auth)])
 async def test_subscriber(chat_id: str):
     sub = get_subscriber(chat_id)
@@ -365,13 +401,17 @@ async def test_subscriber(chat_id: str):
     name = sub.get("first_name") or "there"
     thresh = sub.get("gmp_threshold") if sub.get("gmp_threshold") is not None else config.gmp_threshold
     thresh_tag = " (Customized)" if sub.get("gmp_threshold") is not None else " (System Default)"
+    cat_pref = "Mainboard + SME" if bool(sub.get("enable_sme", 0)) else "Mainboard Only"
+    timing_pref = "Closing Day Only" if bool(sub.get("only_closing_day", 0)) else "All Open Days"
     test_msg = (
         f"⚡ <b>IPO Wise Test Alert</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"👋 Hello <b>{name}</b>!\n\n"
         f"This is a test notification confirming that your Telegram connection to <b>IPO Wise</b> is active and working.\n\n"
         f"📊 <b>Your Alert Threshold:</b> GMP ≥ <b>{thresh}%</b>{thresh_tag}\n"
-        f"<i>(Only IPOs meeting or exceeding this threshold will trigger direct alerts. You can change this anytime with <code>/threshold &lt;number&gt;</code>)</i>"
+        f"🏢 <b>Categories:</b> {cat_pref}\n"
+        f"📅 <b>Alert Timing:</b> {timing_pref}\n\n"
+        f"<i>(You can customize these preferences anytime with <code>/threshold</code>, <code>/sme</code>, or <code>/closingday</code>).</i>"
     )
     success, msg = client.send_message(chat_id=chat_id, text=test_msg)
     if not success:

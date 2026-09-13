@@ -6,7 +6,7 @@ from bot.telegram_client import TelegramClient
 from database import (
     mute_ipo, unmute_ipo, get_muted_ipos, is_ipo_muted, get_settings,
     register_or_update_subscriber, get_subscriber, set_subscriber_status,
-    set_subscriber_threshold, set_subscriber_sme
+    set_subscriber_threshold, set_subscriber_sme, set_subscriber_closing_day
 )
 from config import config
 
@@ -160,6 +160,7 @@ class BotUpdatePoller:
                         "<b>Commands:</b>\n"
                         "• <code>/threshold &lt;number&gt;</code> - Change your alert threshold (e.g. <code>/threshold 20</code>)\n"
                         "• <code>/sme on|off</code> - Enable or disable SME IPO alerts (Default: Mainboard only)\n"
+                        "• <code>/closingday on|off</code> - Receive alerts only on IPO closing day (Default: Off)\n"
                         "• <code>/check</code> - Run an instant check for high GMP IPOs\n"
                         "• <code>/unmute &lt;IPO Name&gt;</code> - Unmute an IPO to resume alerts\n"
                         "• <code>/muted</code> - List your currently muted IPOs\n"
@@ -277,6 +278,46 @@ class BotUpdatePoller:
                     f"{action_hint}"
                 )
 
+        elif cmd in ["/closingday", "/closing", "/lastday"] and is_private:
+            sub = get_subscriber(chat_id)
+            if not sub or sub.get("status") != "approved":
+                client.send_message(chat_id, "ℹ️ You must have an approved subscription to configure alert preferences. Send <code>/subscribe</code> to request access.")
+                return
+
+            sub_closing = bool(sub.get("only_closing_day", 0))
+            sub_sme = bool(sub.get("enable_sme", 0))
+            sub_thresh = sub.get("gmp_threshold") if sub.get("gmp_threshold") is not None else config.gmp_threshold
+            cat_desc = "Mainboard and SME IPOs" if sub_sme else "Mainboard IPOs"
+
+            arg_lower = args.lower().strip()
+            if arg_lower in ["on", "enable", "yes", "true", "1"]:
+                set_subscriber_closing_day(chat_id, True)
+                client.send_message(
+                    chat_id,
+                    f"✅ <b>Closing Day Alerts Enabled!</b>\n\n"
+                    f"You will now only receive notifications on the <b>final closing day</b> of eligible {cat_desc} (GMP ≥ {sub_thresh}%).\n\n"
+                    f"<i>(To receive alerts on all open days anytime, send <code>/closingday off</code>).</i>"
+                )
+            elif arg_lower in ["off", "disable", "no", "false", "0"]:
+                set_subscriber_closing_day(chat_id, False)
+                client.send_message(
+                    chat_id,
+                    f"🔔 <b>Daily Alerts Enabled.</b>\n\n"
+                    f"You will now receive alerts on <b>all open days</b> for eligible {cat_desc} (GMP ≥ {sub_thresh}%).\n\n"
+                    f"<i>(To switch to closing day only anytime, send <code>/closingday on</code>).</i>"
+                )
+            else:
+                curr_status = "Closing Day Only (Active)" if sub_closing else "All Open Days (Default)"
+                action_hint = "Send <code>/closingday off</code> to receive alerts on all open days." if sub_closing else "Send <code>/closingday on</code> to only receive alerts on closing day."
+                client.send_message(
+                    chat_id,
+                    f"📅 <b>Alert Timing Preference</b>\n\n"
+                    f"• <b>Notification Timing:</b> <b>{curr_status}</b>\n"
+                    f"• <b>Active Categories:</b> {cat_desc}\n\n"
+                    f"When enabled, you only receive alerts on the final closing day of open IPOs.\n\n"
+                    f"{action_hint}"
+                )
+
         elif cmd == "/unsubscribe" and is_private:
             set_subscriber_status(chat_id, "unsubscribed")
             client.send_message(chat_id, "🔕 <b>You have unsubscribed.</b> You will no longer receive direct IPO alerts. You can resubscribe anytime by sending <code>/subscribe</code>.")
@@ -286,6 +327,7 @@ class BotUpdatePoller:
                 "👋 <b>IPO Wise Alert Bot Commands</b>\n\n"
                 "• <code>/threshold &lt;val&gt;</code> - View or change your personal GMP alert threshold\n"
                 "• <code>/sme on|off</code> - Enable or disable SME IPO alerts\n"
+                "• <code>/closingday on|off</code> - Only receive alerts on the final closing day of an IPO\n"
                 "• <code>/check</code> - Run an instant check for high GMP IPOs\n"
                 "• <code>/status</code> - View your subscription settings & schedule\n"
                 "• <code>/subscribe</code> - Request personal direct alerts\n"
@@ -304,14 +346,16 @@ class BotUpdatePoller:
                 if sub and sub.get("status") == "approved":
                     user_thresh = sub.get("gmp_threshold") if sub.get("gmp_threshold") is not None else config.gmp_threshold
                     sme_status = "Subscribed" if bool(sub.get("enable_sme", 0)) else "Disabled (/sme on to enable)"
+                    closing_status = "Closing Day Only (/closingday off to change)" if bool(sub.get("only_closing_day", 0)) else "All Open Days (/closingday on to change)"
                     reply = (
                         f"<b>Subscription Status</b>\n\n"
                         f"• Status: Active (Approved)\n"
                         f"• Alert Threshold: GMP ≥ {user_thresh}%\n"
                         f"• Mainboard IPOs: Subscribed\n"
                         f"• SME IPOs: {sme_status}\n"
+                        f"• Alert Timing: {closing_status}\n"
                         f"• Schedule: Daily checks at {times_str}\n\n"
-                        f"<i>Tip: Use <code>/threshold &lt;number&gt;</code> or <code>/sme on|off</code> to customize your alerts.</i>"
+                        f"<i>Tip: Use <code>/threshold &lt;number&gt;</code>, <code>/sme on|off</code>, or <code>/closingday on|off</code> to customize your alerts.</i>"
                     )
                 elif sub and sub.get("status") == "pending":
                     reply = (
