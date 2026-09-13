@@ -14,7 +14,7 @@ from database import (
     verify_admin_login, create_session, validate_session,
     delete_session, set_admin_password,
     get_subscribers, get_subscriber, set_subscriber_status, delete_subscriber,
-    set_subscriber_sme, set_subscriber_closing_day
+    set_subscriber_sme, set_subscriber_closing_day, set_subscriber_bid_button
 )
 from bot.telegram_client import TelegramClient
 from scraper.investorgain import InvestorGainScraper
@@ -387,6 +387,21 @@ async def toggle_subscriber_closing_day(chat_id: str):
         "message": f"Closing-day-only alerts {'enabled' if new_val else 'disabled'} for subscriber"
     }
 
+@app.post("/api/subscribers/{chat_id}/toggle-bid-button", dependencies=[Depends(require_auth)])
+async def toggle_subscriber_bid_button(chat_id: str):
+    sub = get_subscriber(chat_id)
+    if not sub:
+        raise HTTPException(status_code=404, detail="Subscriber not found")
+    
+    current_val = bool(sub.get("disable_bid_button", 0))
+    new_val = not current_val
+    set_subscriber_bid_button(chat_id, new_val)
+    return {
+        "status": "success",
+        "disable_bid_button": new_val,
+        "message": f"Place Bid button {'hidden (disabled)' if new_val else 'shown (enabled)'} for subscriber"
+    }
+
 @app.post("/api/subscribers/{chat_id}/test", dependencies=[Depends(require_auth)])
 async def test_subscriber(chat_id: str):
     sub = get_subscriber(chat_id)
@@ -403,15 +418,17 @@ async def test_subscriber(chat_id: str):
     thresh_tag = " (Customized)" if sub.get("gmp_threshold") is not None else " (System Default)"
     cat_pref = "Mainboard + SME" if bool(sub.get("enable_sme", 0)) else "Mainboard Only"
     timing_pref = "Closing Day Only" if bool(sub.get("only_closing_day", 0)) else "All Open Days"
+    bid_pref = "Disabled (Hidden)" if bool(sub.get("disable_bid_button", 0)) else "Enabled (Shown)"
     test_msg = (
-        f"⚡ <b>IPO Wise Test Alert</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"👋 Hello <b>{name}</b>!\n\n"
-        f"This is a test notification confirming that your Telegram connection to <b>IPO Wise</b> is active and working.\n\n"
-        f"📊 <b>Your Alert Threshold:</b> GMP ≥ <b>{thresh}%</b>{thresh_tag}\n"
-        f"🏢 <b>Categories:</b> {cat_pref}\n"
-        f"📅 <b>Alert Timing:</b> {timing_pref}\n\n"
-        f"<i>(You can customize these preferences anytime with <code>/threshold</code>, <code>/sme</code>, or <code>/closingday</code>).</i>"
+        f"<b>IPO-WISE | Pipeline Verification</b>\n\n"
+        f"<b>Recipient:</b> {name}\n"
+        f"<b>Status:</b> Active\n\n"
+        f"<b>Active Parameters</b>\n"
+        f"• Threshold: <b>GMP ≥ {thresh}%</b>{thresh_tag}\n"
+        f"• Coverage: <b>{cat_pref}</b>\n"
+        f"• Timing: <b>{timing_pref}</b>\n"
+        f"• Broker Link: <b>{bid_pref}</b>\n\n"
+        f"<i>Alert dispatch pipeline verified. Send /status anytime to adjust parameters.</i>"
     )
     success, msg = client.send_message(chat_id=chat_id, text=test_msg)
     if not success:

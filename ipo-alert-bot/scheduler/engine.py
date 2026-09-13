@@ -231,8 +231,10 @@ class AlertScheduler:
                         print(f"[AlertScheduler] Skipping '{name}' for '{target_chat_override}': Muted by user.")
                         continue
 
-                    text_to_send = group_card_html if is_group else dm_card_html
-                    markup_to_send = None if is_group else dm_markup
+                    disable_bid = bool(target_sub.get("disable_bid_button", 0)) if target_sub else False
+                    target_card_html, target_markup = TelegramClient.format_ipo_alert(ipo, include_buttons=True, hide_bid_button=disable_bid)
+                    text_to_send = group_card_html if is_group else target_card_html
+                    markup_to_send = None if is_group else target_markup
 
                     if client:
                         success, msg = client.send_message(chat_id=target_chat_override, text=text_to_send, reply_markup=markup_to_send)
@@ -325,7 +327,9 @@ class AlertScheduler:
                             continue
 
                         if client:
-                            success, msg = client.send_message(chat_id=sub_chat_id, text=dm_card_html, reply_markup=dm_markup)
+                            sub_hide_bid = bool(sub.get("disable_bid_button", 0))
+                            sub_card_html, sub_markup = TelegramClient.format_ipo_alert(ipo, include_buttons=True, hide_bid_button=sub_hide_bid)
+                            success, msg = client.send_message(chat_id=sub_chat_id, text=sub_card_html, reply_markup=sub_markup)
                             log_alert(
                                 ipo_name=name,
                                 gmp_val=ipo.get("gmp_val", ""),

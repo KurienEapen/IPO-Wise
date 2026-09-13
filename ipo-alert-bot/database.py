@@ -67,6 +67,7 @@ def init_db():
         gmp_threshold REAL DEFAULT NULL,
         enable_sme INTEGER DEFAULT 0,
         only_closing_day INTEGER DEFAULT 0,
+        disable_bid_button INTEGER DEFAULT 0,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
     )
@@ -79,6 +80,8 @@ def init_db():
         cursor.execute("ALTER TABLE subscribers ADD COLUMN enable_sme INTEGER DEFAULT 0")
     if sub_cols and "only_closing_day" not in sub_cols:
         cursor.execute("ALTER TABLE subscribers ADD COLUMN only_closing_day INTEGER DEFAULT 0")
+    if sub_cols and "disable_bid_button" not in sub_cols:
+        cursor.execute("ALTER TABLE subscribers ADD COLUMN disable_bid_button INTEGER DEFAULT 0")
     
     # Table for dispatch alert logs
     cursor.execute("""
@@ -345,6 +348,19 @@ def set_subscriber_closing_day(chat_id: str, only_closing_day: bool) -> bool:
     cursor = conn.cursor()
     try:
         cursor.execute("UPDATE subscribers SET only_closing_day = ?, updated_at = ? WHERE chat_id = ?", (val, now_str, cid))
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
+
+def set_subscriber_bid_button(chat_id: str, disable_bid: bool) -> bool:
+    cid = str(chat_id).strip()
+    val = 1 if disable_bid else 0
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("UPDATE subscribers SET disable_bid_button = ?, updated_at = ? WHERE chat_id = ?", (val, now_str, cid))
         conn.commit()
         return cursor.rowcount > 0
     finally:

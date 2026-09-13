@@ -69,6 +69,22 @@ class TelegramClient:
         except Exception:
             pass
 
+    def edit_message_text(self, chat_id: str, message_id: int, text: str, reply_markup: Optional[Dict[str, Any]] = None) -> bool:
+        try:
+            payload = {
+                "chat_id": str(chat_id).strip(),
+                "message_id": message_id,
+                "text": text,
+                "parse_mode": "HTML",
+                "disable_web_page_preview": True
+            }
+            if reply_markup is not None:
+                payload["reply_markup"] = json.dumps(reply_markup)
+            resp = requests.post(f"{self.base_url}/editMessageText", data=payload, timeout=8)
+            return resp.status_code == 200 and resp.json().get("ok", False)
+        except Exception:
+            return False
+
     def delete_webhook(self, drop_pending_updates: bool = False) -> bool:
         if not self.token:
             return False
@@ -80,7 +96,7 @@ class TelegramClient:
             return False
 
     @staticmethod
-    def format_ipo_alert(ipo: Dict[str, Any], include_buttons: bool = True) -> Tuple[str, Optional[Dict[str, Any]]]:
+    def format_ipo_alert(ipo: Dict[str, Any], include_buttons: bool = True, hide_bid_button: bool = False) -> Tuple[str, Optional[Dict[str, Any]]]:
         """Formats the IPO card and returns (html_text, inline_keyboard_markup).
         Clean, icon-free layout with separate sHNI/bHNI, Investment section, and Add to Calendar."""
         name = ipo.get("name", "Unknown IPO").strip()
@@ -206,24 +222,24 @@ class TelegramClient:
         else:
             bid_url = "https://kite.zerodha.com/bids/ipo"
 
-        reply_markup = {
-            "inline_keyboard": [
-                [
-                    {
-                        "text": "⚡ Place Bid",
-                        "url": bid_url
-                    }
-                ],
-                [
-                    {
-                        "text": "Mute",
-                        "callback_data": f"mute:user:{cb_name}"
-                    },
-                    {
-                        "text": "Add to Calendar",
-                        "url": cal_url
-                    }
-                ]
-            ]
-        }
+        button_rows = []
+        if not hide_bid_button:
+            button_rows.append([
+                {
+                    "text": "Place Bid",
+                    "url": bid_url
+                }
+            ])
+        button_rows.append([
+            {
+                "text": "Mute",
+                "callback_data": f"mute:user:{cb_name}"
+            },
+            {
+                "text": "Add to Calendar",
+                "url": cal_url
+            }
+        ])
+
+        reply_markup = {"inline_keyboard": button_rows}
         return html_msg, reply_markup

@@ -1,14 +1,76 @@
 import time
 import threading
 import requests
-from typing import Optional, Callable
+from typing import Optional, Callable, Tuple
 from bot.telegram_client import TelegramClient
 from database import (
     mute_ipo, unmute_ipo, get_muted_ipos, is_ipo_muted, get_settings,
     register_or_update_subscriber, get_subscriber, set_subscriber_status,
-    set_subscriber_threshold, set_subscriber_sme, set_subscriber_closing_day
+    set_subscriber_threshold, set_subscriber_sme, set_subscriber_closing_day,
+    set_subscriber_bid_button
 )
 from config import config
+
+def build_onboarding_view(sub: dict) -> Tuple[str, dict]:
+    """Generates a high-density, institutional-grade alert configuration card
+    and symmetrical inline keyboard per Impeccable standards."""
+    name_disp = sub.get("first_name") or sub.get("username") or "Investor"
+    status = sub.get("status", "pending")
+    thresh = sub.get("gmp_threshold") if sub.get("gmp_threshold") is not None else config.gmp_threshold
+    is_sme = bool(sub.get("enable_sme", 0))
+    is_closing = bool(sub.get("only_closing_day", 0))
+    is_bid_disabled = bool(sub.get("disable_bid_button", 0))
+
+    if status == "approved":
+        status_line = "Active (Approved)"
+        status_note = ""
+    elif status == "pending":
+        status_line = "Pending Approval"
+        status_note = "<i>Account review pending. Configured parameters will activate automatically upon approval.</i>\n\n"
+    elif status == "rejected":
+        status_line = "Inactive (Under Review)"
+        status_note = "<i>Account not currently routed for alerts. Web console approval required.</i>\n\n"
+    else: # unsubscribed
+        status_line = "Unsubscribed"
+        status_note = "<i>Direct alerts paused. Send /subscribe to re-activate.</i>\n\n"
+
+    sme_disp = "Enabled (Mainboard + SME)" if is_sme else "Disabled (Mainboard only)"
+    timing_disp = "Closing Day Only" if is_closing else "All Open Days"
+    bid_disp = "Hidden" if is_bid_disabled else "Enabled"
+
+    card_text = (
+        f"<b>IPO-WISE | Alert Preferences</b>\n\n"
+        f"<b>Subscriber:</b> {name_disp}\n"
+        f"<b>Status:</b> {status_line}\n"
+        f"{status_note}"
+        f"<b>Parameters</b>\n"
+        f"• Threshold: <b>GMP ≥ {thresh}%</b>\n"
+        f"• SME Coverage: <b>{sme_disp}</b>\n"
+        f"• Timing: <b>{timing_disp}</b>\n"
+        f"• Broker Link: <b>{bid_disp}</b>"
+    )
+
+    sme_btn = "SME: Enabled" if is_sme else "SME: Disabled"
+    closing_btn = "Timing: Closing Day" if is_closing else "Timing: All Days"
+    bid_btn = "Bid Link: Hidden" if is_bid_disabled else "Bid Link: Shown"
+
+    reply_markup = {
+        "inline_keyboard": [
+            [
+                {"text": sme_btn, "callback_data": "cfg:sme"},
+                {"text": closing_btn, "callback_data": "cfg:closing"}
+            ],
+            [
+                {"text": bid_btn, "callback_data": "cfg:bid"},
+                {"text": f"Threshold: ≥ {thresh}%", "callback_data": "cfg:threshold"}
+            ],
+            [
+                {"text": "Check Open IPOs", "callback_data": "cfg:check"},
+                {"text": "Commands", "callback_data": "cfg:help"}
+            ]
+        ]
+    }
+    return card_text, reply_markup
 
 class BotUpdatePoller:
     def __init__(self, manual_check_trigger: Optional[Callable] = None):
@@ -127,6 +189,90 @@ class BotUpdatePoller:
         elif cb_data.startswith("noop:"):
             client.answer_callback_query(cb_id, "This IPO alert is already muted for you.", show_alert=False)
 
+        elif cb_data.startswith("cfg:"):
+            action = cb_data.split(":", 1)[1]
+            sub = get_subscriber(user_id) or get_subscriber(chat_id)
+            if not sub:
+                sub = register_or_update_subscriber(chat_id=user_id or chat_id)
+            sub_chat = sub.get("chat_id") or user_id or chat_id
+
+            if action == "sme":
+                new_val = not bool(sub.get("enable_sme", 0))
+                set_subscriber_sme(sub_chat, new_val)
+                toast = f"SME Alerts: {'Enabled (Mainboard + SME)' if new_val else 'Disabled (Mainboard only)'}"
+                client.answer_callback_query(cb_id, toast, show_alert=False)
+                sub["enable_sme"] = 1 if new_val else 0
+                new_text, new_markup = build_onboarding_view(sub)
+                if chat_id and message_id:
+                    client.edit_message_text(chat_id, message_id, new_text, new_markup)
+
+            elif action == "closing":
+                new_val = not bool(sub.get("only_closing_day", 0))
+                set_subscriber_closing_day(sub_chat, new_val)
+                toast = f"Alert Timing: {'Closing Day Only' if new_val else 'All Open Days'}"
+                client.answer_callback_query(cb_id, toast, show_alert=False)
+                sub["only_closing_day"] = 1 if new_val else 0
+                new_text, new_markup = build_onboarding_view(sub)
+                if chat_id and message_id:
+                    client.edit_message_text(chat_id, message_id, new_text, new_markup)
+
+            elif action == "bid":
+                new_val = not bool(sub.get("disable_bid_button", 0))
+                set_subscriber_bid_button(sub_chat, new_val)
+                toast = f"Broker Link: {'Hidden' if new_val else 'Enabled'}"
+                client.answer_callback_query(cb_id, toast, show_alert=False)
+                sub["disable_bid_button"] = 1 if new_val else 0
+                new_text, new_markup = build_onboarding_view(sub)
+                if chat_id and message_id:
+                    client.edit_message_text(chat_id, message_id, new_text, new_markup)
+
+            elif action == "threshold":
+                curr_thresh = sub.get("gmp_threshold") if sub.get("gmp_threshold") is not None else config.gmp_threshold
+                info = (
+                    f"Alert Threshold: GMP ≥ {curr_thresh}%\n\n"
+                    "To update your threshold, send a command in this chat:\n"
+                    "• /threshold <val> (e.g. /threshold 20)\n"
+                    "• /threshold default (reset to system default)"
+                )
+                client.answer_callback_query(cb_id, info, show_alert=True)
+
+            elif action == "refresh":
+                fresh_sub = get_subscriber(sub_chat) or sub
+                new_text, new_markup = build_onboarding_view(fresh_sub)
+                client.answer_callback_query(cb_id, "Preferences refreshed.", show_alert=False)
+                if chat_id and message_id:
+                    client.edit_message_text(chat_id, message_id, new_text, new_markup)
+
+            elif action == "check":
+                client.answer_callback_query(cb_id, "Checking open IPOs...", show_alert=False)
+                client.send_message(chat_id, "<i>Checking open IPOs matching criteria...</i>")
+                if self.manual_check_trigger:
+                    count = self.manual_check_trigger(target_chat_override=chat_id)
+                    if count == 0:
+                        client.send_message(chat_id, "No unmuted open IPOs currently meet your alert criteria.")
+                else:
+                    client.send_message(chat_id, "Check runner is currently offline.")
+
+            elif action == "help":
+                client.answer_callback_query(cb_id, "Commands list sent below.", show_alert=False)
+                self._send_help(client, chat_id)
+
+    def _send_help(self, client: TelegramClient, chat_id: str):
+        reply = (
+            "<b>IPO-WISE | Available Commands</b>\n\n"
+            "• <code>/start</code> - Open interactive alert preferences\n"
+            "• <code>/status</code> - View and adjust notification parameters\n"
+            "• <code>/threshold &lt;val&gt;</code> - View or update GMP threshold\n"
+            "• <code>/sme on|off</code> - Enable or disable SME IPO alerts\n"
+            "• <code>/closingday on|off</code> - Limit alerts to final closing day\n"
+            "• <code>/bidbutton on|off</code> - Show or hide Place Bid broker link\n"
+            "• <code>/check</code> - Run instant check for active IPOs\n"
+            "• <code>/unmute &lt;IPO Name&gt;</code> - Unmute an IPO to resume alerts\n"
+            "• <code>/muted</code> - List currently muted IPOs\n"
+            "• <code>/unsubscribe</code> - Pause direct alerts\n"
+        )
+        client.send_message(chat_id, reply)
+
     def _handle_message(self, client: TelegramClient, msg: dict):
         text = msg.get("text", "").strip()
         chat_id = str(msg.get("chat", {}).get("id", ""))
@@ -145,57 +291,18 @@ class BotUpdatePoller:
 
         if cmd in ["/start", "/subscribe"]:
             if is_private:
-                # Register or check subscriber
                 sub = register_or_update_subscriber(chat_id=chat_id, username=username, first_name=first_name, last_name=last_name)
-                status = sub.get("status", "pending")
-                name_disp = first_name or "there"
-                thresh = sub.get("gmp_threshold") if sub.get("gmp_threshold") is not None else config.gmp_threshold
-
-                if status == "approved":
-                    reply = (
-                        f"👋 <b>Welcome back, {name_disp}!</b>\n\n"
-                        "✅ <b>You are an active, approved subscriber to IPO Wise!</b>\n"
-                        f"📊 <b>Your Alert Threshold:</b> GMP ≥ <b>{thresh}%</b>\n"
-                        "<i>(You will only receive alerts for open IPOs that meet or exceed this threshold)</i>\n\n"
-                        "<b>Commands:</b>\n"
-                        "• <code>/threshold &lt;number&gt;</code> - Change your alert threshold (e.g. <code>/threshold 20</code>)\n"
-                        "• <code>/sme on|off</code> - Enable or disable SME IPO alerts (Default: Mainboard only)\n"
-                        "• <code>/closingday on|off</code> - Receive alerts only on IPO closing day (Default: Off)\n"
-                        "• <code>/check</code> - Run an instant check for high GMP IPOs\n"
-                        "• <code>/unmute &lt;IPO Name&gt;</code> - Unmute an IPO to resume alerts\n"
-                        "• <code>/muted</code> - List your currently muted IPOs\n"
-                        "• <code>/status</code> - View your subscription settings & schedule\n"
-                        "• <code>/unsubscribe</code> - Stop receiving direct alerts\n"
-                    )
-                elif status == "pending":
-                    reply = (
-                        f"👋 <b>Hello {name_disp}!</b>\n\n"
-                        "⏳ <b>Subscription Request Received!</b>\n"
-                        "Your request to receive direct IPO notifications has been recorded and is currently awaiting administrator approval.\n\n"
-                        f"📊 <b>Alert Criteria:</b> Default is GMP ≥ <b>{config.gmp_threshold}%</b>. Only IPOs meeting this threshold will trigger alerts.\n"
-                        "<i>(You can customize your personal threshold using <code>/threshold &lt;number&gt;</code> once approved).</i>\n\n"
-                        "You will automatically receive a message here as soon as an admin approves your access."
-                    )
-                elif status == "rejected":
-                    reply = (
-                        f"ℹ️ <b>Subscription Request Pending Review</b>\n\n"
-                        "Your subscription status is currently not active. An admin can review and approve your account on the web console.\n"
-                        "To re-submit a request, send <code>/subscribe</code>."
-                    )
-                else: # unsubscribed
-                    reply = (
-                        "ℹ️ <b>You are currently unsubscribed from alerts.</b>\n\n"
-                        "To request subscription again, send <code>/subscribe</code>."
-                    )
+                card_text, card_markup = build_onboarding_view(sub)
+                client.send_message(chat_id, card_text, reply_markup=card_markup)
             else:
                 reply = (
-                    "👋 <b>Welcome to IPO Wise Alert Bot!</b>\n\n"
-                    f"I monitor open Indian IPOs and post alerts here whenever an IPO meets GMP ≥ {config.gmp_threshold}%.\n\n"
-                    "• For private 1-on-1 alerts, message me directly in a private chat!\n"
-                    "• <code>/check</code> - Run an instant check\n"
+                    "<b>IPO-WISE | Automated Intelligence</b>\n\n"
+                    f"Monitoring active Indian IPOs with GMP ≥ {config.gmp_threshold}%.\n\n"
+                    "• For private 1-on-1 alerts, message this bot in a direct chat.\n"
+                    "• <code>/check</code> - Run instant market check\n"
                     "• <code>/status</code> - View bot configuration\n"
                 )
-            client.send_message(chat_id, reply)
+                client.send_message(chat_id, reply)
 
         elif cmd in ["/threshold", "/gmp"] and is_private:
             sub = get_subscriber(chat_id)
@@ -204,19 +311,19 @@ class BotUpdatePoller:
                 custom_tag = " (Customized)" if (sub and sub.get("gmp_threshold") is not None) else " (System Default)"
                 client.send_message(
                     chat_id,
-                    f"📊 <b>Your Alert Threshold:</b> <b>{current_thresh}%</b>{custom_tag}\n\n"
-                    f"You will only receive alerts when an IPO's Grey Market Premium (GMP) is at or above this percentage.\n\n"
-                    f"<b>To change your threshold:</b>\n"
-                    f"• Type <code>/threshold &lt;number&gt;</code> (e.g. <code>/threshold 20</code> or <code>/threshold 12.5</code>)\n"
-                    f"• Type <code>/threshold default</code> to reset back to system default ({config.gmp_threshold}%)"
+                    f"<b>Alert Threshold:</b> <b>{current_thresh}%</b>{custom_tag}\n\n"
+                    f"Alerts will trigger when an IPO's Grey Market Premium meets or exceeds this cutoff.\n\n"
+                    f"<b>Update threshold:</b>\n"
+                    f"• <code>/threshold &lt;val&gt;</code> (e.g. <code>/threshold 20</code>)\n"
+                    f"• <code>/threshold default</code> (reset to system default {config.gmp_threshold}%)"
                 )
             else:
                 if args.lower() in ["default", "reset"]:
                     set_subscriber_threshold(chat_id, None)
                     client.send_message(
                         chat_id,
-                        f"✅ <b>Threshold Reset!</b>\n\n"
-                        f"Your alert threshold has been reset to the system default of <b>{config.gmp_threshold}%</b>."
+                        f"<b>Alert Threshold Reset</b>\n\n"
+                        f"Alert threshold reset to system default of <b>{config.gmp_threshold}%</b>."
                     )
                 else:
                     try:
@@ -227,15 +334,15 @@ class BotUpdatePoller:
                         set_subscriber_threshold(chat_id, val)
                         client.send_message(
                             chat_id,
-                            f"✅ <b>Threshold Updated!</b>\n\n"
-                            f"Your personal alert threshold is now set to <b>{val}%</b>.\n"
-                            f"You will only receive alerts for open IPOs with a GMP of <b>{val}% or higher</b>."
+                            f"<b>Alert Threshold Updated</b>\n\n"
+                            f"Personal alert threshold set to <b>{val}%</b>.\n"
+                            f"Alerts will route for open IPOs with GMP ≥ <b>{val}%</b>."
                         )
                     except ValueError:
                         client.send_message(
                             chat_id,
-                            "⚠️ <b>Invalid Threshold</b>\n\n"
-                            "Please enter a valid percentage number. Examples:\n"
+                            "<b>Invalid Threshold Parameter</b>\n\n"
+                            "Please provide a valid percentage number. Examples:\n"
                             "• <code>/threshold 20</code>\n"
                             "• <code>/threshold 12.5</code>\n"
                             "• <code>/threshold default</code>"
@@ -244,7 +351,7 @@ class BotUpdatePoller:
         elif cmd == "/sme" and is_private:
             sub = get_subscriber(chat_id)
             if not sub or sub.get("status") != "approved":
-                client.send_message(chat_id, "ℹ️ You must have an approved subscription to configure alert categories. Send <code>/subscribe</code> to request access.")
+                client.send_message(chat_id, "Account review pending. Send <code>/subscribe</code> to register.")
                 return
 
             sub_sme = bool(sub.get("enable_sme", 0))
@@ -255,33 +362,32 @@ class BotUpdatePoller:
                 set_subscriber_sme(chat_id, True)
                 client.send_message(
                     chat_id,
-                    f"✅ <b>SME Alerts Enabled!</b>\n\n"
-                    f"You will now receive alerts for both <b>Mainboard and SME IPOs</b> that meet your threshold (GMP ≥ {sub_thresh}%).\n\n"
-                    f"<i>(To turn off SME alerts anytime, send <code>/sme off</code>).</i>"
+                    f"<b>SME Coverage Enabled</b>\n\n"
+                    f"Alerts will route for both <b>Mainboard and SME IPOs</b> (GMP ≥ {sub_thresh}%).\n\n"
+                    f"<i>(To disable SME coverage, send <code>/sme off</code>).</i>"
                 )
             elif arg_lower in ["off", "disable", "no", "false", "0"]:
                 set_subscriber_sme(chat_id, False)
                 client.send_message(
                     chat_id,
-                    f"🚫 <b>SME Alerts Disabled.</b>\n\n"
-                    f"You will only receive alerts for <b>Mainboard IPOs</b> (GMP ≥ {sub_thresh}%).\n\n"
-                    f"<i>(To re-enable SME alerts, send <code>/sme on</code>).</i>"
+                    f"<b>SME Coverage Disabled</b>\n\n"
+                    f"Alerts will route for <b>Mainboard IPOs only</b> (GMP ≥ {sub_thresh}%).\n\n"
+                    f"<i>(To re-enable SME coverage, send <code>/sme on</code>).</i>"
                 )
             else:
-                curr_status = "Subscribed (Active)" if sub_sme else "Disabled"
-                action_hint = "Send <code>/sme off</code> to disable SME alerts." if sub_sme else "Send <code>/sme on</code> to subscribe to SME IPOs."
+                curr_status = "Enabled (Mainboard + SME)" if sub_sme else "Disabled (Mainboard only)"
+                action_hint = "Send <code>/sme off</code> to disable." if sub_sme else "Send <code>/sme on</code> to enable."
                 client.send_message(
                     chat_id,
-                    f"🏢 <b>Category Subscriptions</b>\n\n"
-                    f"• <b>Mainboard IPOs:</b> Subscribed (Default)\n"
-                    f"• <b>SME IPOs:</b> <b>{curr_status}</b>\n\n"
+                    f"<b>IPO Category Coverage</b>\n\n"
+                    f"• Status: <b>{curr_status}</b>\n\n"
                     f"{action_hint}"
                 )
 
         elif cmd in ["/closingday", "/closing", "/lastday"] and is_private:
             sub = get_subscriber(chat_id)
             if not sub or sub.get("status") != "approved":
-                client.send_message(chat_id, "ℹ️ You must have an approved subscription to configure alert preferences. Send <code>/subscribe</code> to request access.")
+                client.send_message(chat_id, "Account review pending. Send <code>/subscribe</code> to register.")
                 return
 
             sub_closing = bool(sub.get("only_closing_day", 0))
@@ -294,125 +400,119 @@ class BotUpdatePoller:
                 set_subscriber_closing_day(chat_id, True)
                 client.send_message(
                     chat_id,
-                    f"✅ <b>Closing Day Alerts Enabled!</b>\n\n"
-                    f"You will now only receive notifications on the <b>final closing day</b> of eligible {cat_desc} (GMP ≥ {sub_thresh}%).\n\n"
-                    f"<i>(To receive alerts on all open days anytime, send <code>/closingday off</code>).</i>"
+                    f"<b>Closing Day Timing Enabled</b>\n\n"
+                    f"Alerts will only trigger on the <b>final closing day</b> for eligible {cat_desc} (GMP ≥ {sub_thresh}%).\n\n"
+                    f"<i>(To receive alerts on all open days, send <code>/closingday off</code>).</i>"
                 )
             elif arg_lower in ["off", "disable", "no", "false", "0"]:
                 set_subscriber_closing_day(chat_id, False)
                 client.send_message(
                     chat_id,
-                    f"🔔 <b>Daily Alerts Enabled.</b>\n\n"
-                    f"You will now receive alerts on <b>all open days</b> for eligible {cat_desc} (GMP ≥ {sub_thresh}%).\n\n"
-                    f"<i>(To switch to closing day only anytime, send <code>/closingday on</code>).</i>"
+                    f"<b>Daily Timing Enabled</b>\n\n"
+                    f"Alerts will route on <b>all open days</b> for eligible {cat_desc} (GMP ≥ {sub_thresh}%).\n\n"
+                    f"<i>(To limit to closing day only, send <code>/closingday on</code>).</i>"
                 )
             else:
-                curr_status = "Closing Day Only (Active)" if sub_closing else "All Open Days (Default)"
-                action_hint = "Send <code>/closingday off</code> to receive alerts on all open days." if sub_closing else "Send <code>/closingday on</code> to only receive alerts on closing day."
+                curr_status = "Closing Day Only" if sub_closing else "All Open Days"
+                action_hint = "Send <code>/closingday off</code> for all open days." if sub_closing else "Send <code>/closingday on</code> for closing day only."
                 client.send_message(
                     chat_id,
-                    f"📅 <b>Alert Timing Preference</b>\n\n"
-                    f"• <b>Notification Timing:</b> <b>{curr_status}</b>\n"
-                    f"• <b>Active Categories:</b> {cat_desc}\n\n"
-                    f"When enabled, you only receive alerts on the final closing day of open IPOs.\n\n"
+                    f"<b>Alert Timing Parameter</b>\n\n"
+                    f"• Timing: <b>{curr_status}</b>\n"
+                    f"• Active Scope: {cat_desc}\n\n"
+                    f"{action_hint}"
+                )
+
+        elif cmd in ["/bidbutton", "/placebid", "/disablebid"] and is_private:
+            sub = get_subscriber(chat_id)
+            if not sub:
+                sub = register_or_update_subscriber(chat_id=chat_id, username=username, first_name=first_name, last_name=last_name)
+
+            sub_bid_disabled = bool(sub.get("disable_bid_button", 0))
+            arg_lower = args.lower().strip()
+            if arg_lower in ["off", "disable", "hide", "no", "false", "0"]:
+                set_subscriber_bid_button(chat_id, True)
+                client.send_message(
+                    chat_id,
+                    "<b>Broker Link Disabled</b>\n\n"
+                    "Alert cards will no longer include the 'Place Bid' broker link.\n\n"
+                    "<i>(To re-enable, send <code>/bidbutton on</code> or adjust via <code>/status</code>).</i>"
+                )
+            elif arg_lower in ["on", "enable", "show", "yes", "true", "1"]:
+                set_subscriber_bid_button(chat_id, False)
+                client.send_message(
+                    chat_id,
+                    "<b>Broker Link Enabled</b>\n\n"
+                    "Alert cards will now include the 1-tap 'Place Bid' broker link.\n\n"
+                    "<i>(To disable, send <code>/bidbutton off</code> or adjust via <code>/status</code>).</i>"
+                )
+            else:
+                curr_status = "Hidden" if sub_bid_disabled else "Enabled (Shown on cards)"
+                action_hint = "Send <code>/bidbutton on</code> to enable." if sub_bid_disabled else "Send <code>/bidbutton off</code> to disable."
+                client.send_message(
+                    chat_id,
+                    f"<b>Broker Link Configuration</b>\n\n"
+                    f"• Status: <b>{curr_status}</b>\n\n"
+                    f"Provides a direct 1-tap broker bidding bridge link on alert cards.\n\n"
                     f"{action_hint}"
                 )
 
         elif cmd == "/unsubscribe" and is_private:
             set_subscriber_status(chat_id, "unsubscribed")
-            client.send_message(chat_id, "🔕 <b>You have unsubscribed.</b> You will no longer receive direct IPO alerts. You can resubscribe anytime by sending <code>/subscribe</code>.")
+            client.send_message(chat_id, "<b>Subscription Paused</b>\n\nDirect IPO alerts are paused. Send <code>/subscribe</code> anytime to resume.")
 
         elif cmd == "/help":
-            reply = (
-                "👋 <b>IPO Wise Alert Bot Commands</b>\n\n"
-                "• <code>/threshold &lt;val&gt;</code> - View or change your personal GMP alert threshold\n"
-                "• <code>/sme on|off</code> - Enable or disable SME IPO alerts\n"
-                "• <code>/closingday on|off</code> - Only receive alerts on the final closing day of an IPO\n"
-                "• <code>/check</code> - Run an instant check for high GMP IPOs\n"
-                "• <code>/status</code> - View your subscription settings & schedule\n"
-                "• <code>/subscribe</code> - Request personal direct alerts\n"
-                "• <code>/unmute &lt;IPO Name&gt;</code> - Unmute an IPO to resume alerts\n"
-                "• <code>/muted</code> - List your currently muted IPOs\n"
-                "• <code>/unsubscribe</code> - Stop receiving direct alerts\n"
-            )
-            client.send_message(chat_id, reply)
+            self._send_help(client, chat_id)
 
         elif cmd == "/status":
-            times = config.schedule_times
-            times_str = ", ".join(times) + " IST"
-            
             if is_private:
                 sub = get_subscriber(chat_id)
-                if sub and sub.get("status") == "approved":
-                    user_thresh = sub.get("gmp_threshold") if sub.get("gmp_threshold") is not None else config.gmp_threshold
-                    sme_status = "Subscribed" if bool(sub.get("enable_sme", 0)) else "Disabled (/sme on to enable)"
-                    closing_status = "Closing Day Only (/closingday off to change)" if bool(sub.get("only_closing_day", 0)) else "All Open Days (/closingday on to change)"
-                    reply = (
-                        f"<b>Subscription Status</b>\n\n"
-                        f"• Status: Active (Approved)\n"
-                        f"• Alert Threshold: GMP ≥ {user_thresh}%\n"
-                        f"• Mainboard IPOs: Subscribed\n"
-                        f"• SME IPOs: {sme_status}\n"
-                        f"• Alert Timing: {closing_status}\n"
-                        f"• Schedule: Daily checks at {times_str}\n\n"
-                        f"<i>Tip: Use <code>/threshold &lt;number&gt;</code>, <code>/sme on|off</code>, or <code>/closingday on|off</code> to customize your alerts.</i>"
-                    )
-                elif sub and sub.get("status") == "pending":
-                    reply = (
-                        f"<b>Subscription Status</b>\n\n"
-                        f"• Status: Pending Approval\n"
-                        f"• Mainboard IPOs: Subscribed by default once approved\n"
-                        f"• SME IPOs: Optional (/sme on)\n"
-                        f"• Schedule: Daily checks at {times_str}\n\n"
-                        f"<i>Your request is awaiting admin approval.</i>"
-                    )
-                else:
-                    reply = (
-                        f"<b>IPO Wise Status</b>\n\n"
-                        f"• Status: Not Subscribed\n"
-                        f"• Schedule: Daily checks at {times_str}\n\n"
-                        f"<i>Send <code>/subscribe</code> to request direct IPO alerts.</i>"
-                    )
+                if not sub:
+                    sub = register_or_update_subscriber(chat_id=chat_id, username=username, first_name=first_name, last_name=last_name)
+                card_text, card_markup = build_onboarding_view(sub)
+                client.send_message(chat_id, card_text, reply_markup=card_markup)
             else:
+                times = config.schedule_times
+                times_str = ", ".join(times) + " IST"
                 reply = (
-                    f"<b>IPO Wise Alert Bot</b>\n\n"
+                    f"<b>IPO-WISE | Terminal Status</b>\n\n"
                     f"• Status: Active\n"
                     f"• Schedule: Daily checks at {times_str}"
                 )
-            client.send_message(chat_id, reply)
+                client.send_message(chat_id, reply)
 
         elif cmd == "/muted":
             muted_list = get_muted_ipos(chat_id=chat_id)
             if not muted_list:
-                client.send_message(chat_id, "ℹ️ You have no currently muted IPOs.")
+                client.send_message(chat_id, "No IPO alerts are currently muted.")
             else:
                 lines = [f"• <b>{m['ipo_name']}</b> ({m['action']}) - {m['created_at'][:10]}" for m in muted_list]
-                reply = "🔕 <b>Your Muted IPOs:</b>\n\n" + "\n".join(lines) + "\n\n<i>Use /unmute &lt;Name&gt; to restore alerts.</i>"
+                reply = "<b>Muted IPOs</b>\n\n" + "\n".join(lines) + "\n\n<i>Use /unmute &lt;Name&gt; to restore alerts.</i>"
                 client.send_message(chat_id, reply)
 
         elif cmd in ["/applied", "/ignore"]:
             action = "APPLIED" if cmd == "/applied" else "IGNORED"
             if not args:
-                client.send_message(chat_id, f"⚠️ Please provide the IPO name. Example: <code>{cmd} Qualiance International</code>")
+                client.send_message(chat_id, f"Please provide the IPO name. Example: <code>{cmd} Qualiance International</code>")
                 return
             mute_ipo(args, chat_id=chat_id, action=action)
-            client.send_message(chat_id, f"✅ Muted alerts for <b>{args}</b> ({action.capitalize()}).")
+            client.send_message(chat_id, f"Muted alerts for <b>{args}</b> ({action.capitalize()}).")
 
         elif cmd == "/unmute":
             if not args:
-                client.send_message(chat_id, "⚠️ Please provide the IPO name. Example: <code>/unmute Qualiance International</code>")
+                client.send_message(chat_id, "Please provide the IPO name. Example: <code>/unmute Qualiance International</code>")
                 return
             success = unmute_ipo(args, chat_id=chat_id)
             if success:
-                client.send_message(chat_id, f"✅ Unmuted <b>{args}</b>. Alerts will resume if it meets criteria.")
+                client.send_message(chat_id, f"Unmuted <b>{args}</b>. Alerts will resume when criteria are met.")
             else:
-                client.send_message(chat_id, f"ℹ️ Could not find '<b>{args}</b>' in your muted list.")
+                client.send_message(chat_id, f"Could not find '<b>{args}</b>' in your muted list.")
 
         elif cmd == "/check":
-            client.send_message(chat_id, "🔍 <i>Checking for open IPOs matching criteria...</i>")
+            client.send_message(chat_id, "<i>Checking open IPOs matching criteria...</i>")
             if self.manual_check_trigger:
                 count = self.manual_check_trigger(target_chat_override=chat_id)
                 if count == 0:
-                    client.send_message(chat_id, "ℹ️ No unmuted open IPOs currently meet the GMP threshold.")
+                    client.send_message(chat_id, "No unmuted open IPOs currently meet your alert criteria.")
             else:
-                client.send_message(chat_id, "⚠️ Check runner is not connected.")
+                client.send_message(chat_id, "Check runner is currently offline.")

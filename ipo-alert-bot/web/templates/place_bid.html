@@ -2,118 +2,227 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Place Bid — IPO Wise</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Place Bid — {{ name or 'IPO Wise' }}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ base_path }}/static/style.css?v=3.6">
+  <link rel="stylesheet" href="{{ base_path }}/static/style.css?v=4.1">
   <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+
     body {
       min-height: 100vh;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 24px 16px;
-      background: radial-gradient(circle at 50% 10%, rgba(99, 102, 241, 0.12), transparent 70%), var(--bg-main);
+      padding: 32px 16px;
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.14) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(6, 182, 212, 0.1) 0px, transparent 50%),
+        radial-gradient(at 50% 100%, rgba(16, 185, 129, 0.08) 0px, transparent 50%);
+      background-attachment: fixed;
       color: var(--text-main);
-      font-family: var(--font-base);
+      font-family: var(--font-body);
+      overflow-x: hidden;
     }
-    .bid-container {
+
+    .bid-shell {
       width: 100%;
-      max-width: 480px;
+      max-width: 540px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .top-nav-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 4px;
+    }
+
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-decoration: none;
+      transition: var(--transition);
+      padding: 4px 0;
+    }
+
+    .back-link:hover {
+      color: var(--text-main);
+      transform: translateX(-2px);
+    }
+
+    .brand-mini {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .bid-container {
       background: var(--bg-card);
-      backdrop-filter: blur(24px);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-lg);
-      padding: 30px 24px;
-      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
-      animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      padding: 28px 24px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+      animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     }
+
     @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(14px); }
+      from { opacity: 0; transform: translateY(10px); }
       to { opacity: 1; transform: translateY(0); }
     }
+
     .header-section {
       text-align: center;
       margin-bottom: 22px;
     }
-    .ipo-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 4px 10px;
-      border-radius: 999px;
-      font-size: 11.5px;
-      font-weight: 700;
-      background: rgba(99, 102, 241, 0.15);
-      color: #818cf8;
-      border: 1px solid rgba(99, 102, 241, 0.3);
-      margin-bottom: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    .ipo-title {
-      font-family: var(--font-heading);
-      font-size: 21px;
-      font-weight: 700;
-      color: var(--text-main);
-      margin-bottom: 6px;
-      line-height: 1.3;
-    }
-    .ipo-subtitle {
-      font-size: 13px;
-      color: var(--text-muted);
-    }
-    /* Copy Quantity Bar */
-    .qty-bar {
-      display: flex;
-      gap: 10px;
-      background: rgba(255, 255, 255, 0.025);
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-md);
-      padding: 10px 14px;
-      margin-bottom: 22px;
-      justify-content: space-around;
-      align-items: center;
-    }
-    .qty-item {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 3px;
-    }
-    .qty-label {
-      font-size: 10.5px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: var(--text-dim);
-      font-weight: 600;
-    }
-    .qty-btn {
+
+    .badge-category {
       display: inline-flex;
       align-items: center;
       gap: 5px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
+    }
+
+    .badge-category.sme {
+      background: rgba(6, 182, 212, 0.12);
+      color: #22d3ee;
+      border: 1px solid rgba(6, 182, 212, 0.3);
+    }
+
+    .badge-category.mainboard {
+      background: rgba(99, 102, 241, 0.12);
+      color: #818cf8;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    .ipo-title {
+      font-family: var(--font-heading);
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 6px;
+      line-height: 1.25;
+      letter-spacing: -0.3px;
+      word-break: break-word;
+    }
+
+    .ipo-subtitle {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    .price-tag {
+      color: var(--text-main);
+      font-weight: 600;
+    }
+
+    /* Tactile Quantity Copy Bar */
+    .qty-section {
+      background: rgba(13, 19, 32, 0.7);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 12px 16px;
+      margin-bottom: 22px;
+    }
+
+    .qty-header {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+      text-align: center;
+    }
+
+    .qty-bar {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .qty-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      min-width: 0;
+    }
+
+    .qty-label {
+      font-size: 11px;
+      color: var(--text-dim);
+      font-weight: 600;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      overflow: hidden;
+      max-width: 100%;
+    }
+
+    .qty-btn {
+      width: 100%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
       background: rgba(99, 102, 241, 0.12);
       border: 1px solid rgba(99, 102, 241, 0.3);
       color: #c7d2fe;
-      font-family: ui-monospace, SFMono-Regular, monospace;
+      font-family: var(--font-heading);
       font-weight: 700;
-      font-size: 13px;
-      padding: 4px 10px;
-      border-radius: 6px;
+      font-size: 14px;
+      padding: 8px 12px;
+      border-radius: 8px;
       cursor: pointer;
-      transition: all 0.15s ease;
+      transition: var(--transition);
+      outline: none;
+      min-height: 40px;
     }
+
     .qty-btn:hover {
       background: rgba(99, 102, 241, 0.25);
       border-color: rgba(99, 102, 241, 0.5);
+      transform: translateY(-1px);
     }
+
+    .qty-btn:active {
+      transform: scale(0.98);
+    }
+
     .qty-btn.copied {
       background: rgba(16, 185, 129, 0.2);
       border-color: rgba(16, 185, 129, 0.5);
       color: #34d399;
     }
+
     .section-label {
       font-size: 11.5px;
       font-weight: 600;
@@ -123,213 +232,495 @@
       margin-bottom: 12px;
       display: flex;
       justify-content: space-between;
-      align-items: center;
+      align-items: baseline;
+      flex-wrap: wrap;
+      gap: 4px 8px;
     }
+
+    .section-hint {
+      font-size: 10.5px;
+      color: var(--text-dim);
+      text-transform: none;
+      letter-spacing: normal;
+      font-weight: 500;
+    }
+
     /* Broker List */
     .broker-list {
       display: flex;
       flex-direction: column;
       gap: 10px;
     }
+
     .broker-card {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      background: rgba(255, 255, 255, 0.03);
+      background: rgba(255, 255, 255, 0.025);
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-md);
-      padding: 12px 16px;
-      text-decoration: none;
+      padding: 12px 14px;
       color: var(--text-main);
-      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: var(--transition);
       cursor: pointer;
-      position: relative;
     }
+
     .broker-card:hover {
-      background: rgba(255, 255, 255, 0.06);
-      border-color: rgba(255, 255, 255, 0.2);
-      transform: translateY(-2px);
-      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+      background: rgba(255, 255, 255, 0.055);
+      border-color: rgba(255, 255, 255, 0.16);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
     }
-    .broker-left {
+
+    .broker-top {
       display: flex;
       align-items: center;
       gap: 12px;
       flex: 1;
       min-width: 0;
-      text-decoration: none;
-      color: var(--text-main);
     }
+
     .broker-icon {
       width: 40px;
       height: 40px;
-      border-radius: 12px;
+      border-radius: 11px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 20px;
-      font-weight: 800;
       flex-shrink: 0;
+      color: #ffffff;
     }
+
     .broker-info {
       text-align: left;
       min-width: 0;
+      flex: 1;
+      margin-right: 12px;
     }
-    .broker-name {
-      font-size: 14.5px;
-      font-weight: 700;
-      color: var(--text-main);
+
+    .broker-name-row {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
     }
+
+    .broker-name {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-main);
+      line-height: 1.25;
+    }
+
     .preferred-tag {
-      font-size: 9.5px;
-      padding: 2px 6px;
-      border-radius: 999px;
-      background: rgba(234, 179, 8, 0.15);
-      color: #facc15;
-      border: 1px solid rgba(234, 179, 8, 0.3);
+      font-size: 10px;
+      padding: 2px 7px;
+      border-radius: 10px;
+      background: rgba(245, 158, 11, 0.15);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.3);
       font-weight: 700;
       text-transform: uppercase;
+      letter-spacing: 0.3px;
+      white-space: nowrap;
     }
+
     .broker-desc {
       font-size: 11.5px;
       color: var(--text-muted);
       margin-top: 2px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      white-space: normal;
+      line-height: 1.35;
     }
+
     .broker-actions {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       flex-shrink: 0;
     }
+
     .action-btn {
       display: inline-flex;
       align-items: center;
-      gap: 4px;
+      gap: 6px;
       padding: 6px 12px;
-      border-radius: 6px;
+      border-radius: 7px;
       font-size: 12px;
       font-weight: 600;
       text-decoration: none;
       cursor: pointer;
-      transition: all 0.15s ease;
+      transition: var(--transition);
       white-space: nowrap;
+      border: 1px solid transparent;
+      outline: none;
     }
-    .action-web {
-      background: rgba(99, 102, 241, 0.15);
-      border: 1px solid rgba(99, 102, 241, 0.35);
-      color: #a5b4fc;
+
+    .action-btn:active {
+      transform: scale(0.97);
     }
-    .action-web:hover {
-      background: rgba(99, 102, 241, 0.3);
-      border-color: rgba(99, 102, 241, 0.6);
-      color: #ffffff;
-      transform: translateY(-1px);
-    }
+
+    /* Mobile/App intent primary button */
     .action-app {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--border-subtle);
-      color: var(--text-main);
+      background: rgba(99, 102, 241, 0.14);
+      border-color: rgba(99, 102, 241, 0.32);
+      color: #c7d2fe;
     }
+
     .action-app:hover {
-      background: rgba(255, 255, 255, 0.12);
-      border-color: rgba(255, 255, 255, 0.25);
-      transform: translateY(-1px);
+      background: rgba(99, 102, 241, 0.25);
+      border-color: var(--primary);
+      color: #ffffff;
     }
-    .tip-box {
-      margin-top: 22px;
-      padding: 12px 14px;
-      background: rgba(255, 255, 255, 0.02);
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-md);
-      font-size: 11.5px;
-      color: var(--text-dim);
-      line-height: 1.5;
-      text-align: left;
-    }
-    .tip-box b {
+
+    /* Web fallback button */
+    .action-web {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: var(--border-subtle);
       color: var(--text-muted);
     }
-    /* Toast */
-    #copy-toast {
+
+    .action-web:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.22);
+      color: var(--text-main);
+    }
+
+    /* Structured Guidance Steps */
+    .guidance-card {
+      margin-top: 22px;
+      background: rgba(13, 19, 32, 0.6);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .guidance-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.45;
+    }
+
+    .step-num {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      color: #a5b4fc;
+      font-size: 10.5px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .step-text b {
+      color: var(--text-main);
+    }
+
+    /* Toast Notification */
+    .copy-toast {
       position: fixed;
       bottom: 24px;
       left: 50%;
       transform: translateX(-50%) translateY(20px);
-      background: #10b981;
+      background: rgba(16, 185, 129, 0.95);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
       color: #ffffff;
       padding: 8px 18px;
-      border-radius: 999px;
+      border-radius: 30px;
       font-size: 12.5px;
       font-weight: 600;
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4), 0 0 15px rgba(16, 185, 129, 0.3);
       opacity: 0;
       pointer-events: none;
-      transition: all 0.25s ease;
+      transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
       z-index: 9999;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      max-width: 90vw;
+      text-align: center;
     }
-    #copy-toast.show {
+
+    .copy-toast.show {
       opacity: 1;
       transform: translateX(-50%) translateY(0);
+    }
+
+    /* ==========================================================================
+       Responsive Mobile Breakpoints (Zero Overlapping Guarantee)
+       ========================================================================== */
+    @media (max-width: 580px) {
+      body {
+        padding: 16px 12px;
+      }
+
+      .bid-shell {
+        gap: 12px;
+      }
+
+      .bid-container {
+        padding: 20px 14px;
+        border-radius: var(--radius-md);
+      }
+
+      .header-section {
+        margin-bottom: 18px;
+      }
+
+      .ipo-title {
+        font-size: 19.5px;
+        letter-spacing: -0.2px;
+      }
+
+      .ipo-subtitle {
+        font-size: 12.5px;
+      }
+
+      .qty-section {
+        padding: 10px 12px;
+        margin-bottom: 18px;
+      }
+
+      .qty-header {
+        font-size: 10.5px;
+        margin-bottom: 8px;
+      }
+
+      .qty-bar {
+        gap: 8px;
+      }
+
+      .qty-label {
+        font-size: 10.5px;
+      }
+
+      .qty-btn {
+        padding: 7px 10px;
+        font-size: 13.5px;
+        min-height: 40px;
+      }
+
+      .section-label {
+        margin-bottom: 10px;
+        font-size: 11px;
+      }
+
+      .section-hint {
+        font-size: 10px;
+      }
+
+      .broker-list {
+        gap: 8px;
+      }
+
+      /* Stack actions below header info on mobile to eliminate all text squishing */
+      .broker-card {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+        padding: 12px;
+      }
+
+      .broker-top {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+      }
+
+      .broker-icon {
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        flex-shrink: 0;
+      }
+
+      .broker-info {
+        flex: 1;
+        min-width: 0;
+        margin-right: 0;
+      }
+
+      .broker-name-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+      }
+
+      .broker-name {
+        font-size: 13.5px;
+      }
+
+      .preferred-tag {
+        font-size: 9.5px;
+        padding: 1.5px 6px;
+        flex-shrink: 0;
+      }
+
+      .broker-desc {
+        font-size: 11px;
+        white-space: normal;
+        line-height: 1.35;
+        margin-top: 2px;
+      }
+
+      .broker-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        width: 100%;
+        padding-top: 8px;
+        border-top: 1px solid rgba(255, 255, 255, 0.04);
+      }
+
+      .action-btn {
+        justify-content: center;
+        padding: 8px 10px;
+        font-size: 12px;
+        min-height: 38px;
+        border-radius: 8px;
+      }
+
+      .guidance-card {
+        margin-top: 18px;
+        padding: 12px;
+        gap: 8px;
+      }
+
+      .guidance-step {
+        font-size: 11.5px;
+        gap: 8px;
+      }
+    }
+
+    @media (max-width: 350px) {
+      body {
+        padding: 12px 8px;
+      }
+
+      .bid-container {
+        padding: 16px 10px;
+      }
+
+      .ipo-title {
+        font-size: 18px;
+      }
+
+      .action-btn {
+        font-size: 11.5px;
+        padding: 7px 6px;
+        gap: 4px;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="bid-container">
-    <div class="header-section">
-      <span class="ipo-badge">
-        <span>⚡</span> {{ category or 'Mainboard' }}
-      </span>
-      <h1 class="ipo-title">{{ name or 'IPO Bidding' }}</h1>
-      <div class="ipo-subtitle">
-        {% if price %}Price: <b>{{ price }}</b> • {% endif %}Choose your broker to apply
+  <div class="bid-shell">
+    <div class="top-nav-bar">
+      <a href="{{ base_path }}/" class="back-link">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="19" y1="12" x2="5" y2="12"></line>
+          <polyline points="12 19 5 12 12 5"></polyline>
+        </svg>
+        Live Market
+      </a>
+      <div class="brand-mini">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline>
+          <polyline points="16 7 22 7 22 13"></polyline>
+        </svg>
+        IPO-Wise Bridge
       </div>
     </div>
 
-    {% if retail_qty or shni_qty %}
-    <div class="qty-bar">
-      {% if retail_qty %}
-      <div class="qty-item">
-        <span class="qty-label">Retail Shares</span>
-        <button type="button" class="qty-btn" onclick="copyQty('{{ retail_qty }}', this)">
-          <span>{{ retail_qty }}</span> <span>📋</span>
-        </button>
+    <div class="bid-container">
+      <div class="header-section">
+        {% set cat = (category or 'Mainboard')|upper %}
+        <span class="badge-category {% if cat == 'SME' %}sme{% else %}mainboard{% endif %}">
+          {% if cat == 'SME' %}SME Board{% else %}Mainboard{% endif %}
+        </span>
+        <h1 class="ipo-title">{{ name or 'IPO Bidding' }}</h1>
+        <div class="ipo-subtitle">
+          {% if price %}Issue Price: <span class="price-tag">{{ price }}</span> • {% endif %}Select trading account
+        </div>
+      </div>
+
+      {% if retail_qty or shni_qty %}
+      <div class="qty-section">
+        <div class="qty-header">Lot Multipliers (Tap to Copy Shares)</div>
+        <div class="qty-bar">
+          {% if retail_qty %}
+          <div class="qty-item">
+            <span class="qty-label">Retail (1 Lot)</span>
+            <button type="button" class="qty-btn" onclick="copyQty('{{ retail_qty }}', this)" title="Click to copy retail lot share count">
+              <span class="qty-num">{{ retail_qty }}</span>
+              <svg class="copy-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+            </button>
+          </div>
+          {% endif %}
+          {% if shni_qty %}
+          <div class="qty-item">
+            <span class="qty-label">sHNI (Min Cutoff)</span>
+            <button type="button" class="qty-btn" onclick="copyQty('{{ shni_qty }}', this)" title="Click to copy sHNI cutoff share count">
+              <span class="qty-num">{{ shni_qty }}</span>
+              <svg class="copy-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+            </button>
+          </div>
+          {% endif %}
+        </div>
       </div>
       {% endif %}
-      {% if shni_qty %}
-      <div class="qty-item">
-        <span class="qty-label">sHNI Shares</span>
-        <button type="button" class="qty-btn" onclick="copyQty('{{ shni_qty }}', this)">
-          <span>{{ shni_qty }}</span> <span>📋</span>
-        </button>
+
+      <div class="section-label">
+        <span>Available Platforms</span>
+        <span class="section-hint">Pinned to top</span>
       </div>
-      {% endif %}
-    </div>
-    {% endif %}
 
-    <div class="section-label">
-      <span>Select Trading Platform</span>
-      <span style="font-size: 10px; color: var(--text-dim); text-transform: none;">Tap Web or App</span>
-    </div>
+      <div class="broker-list" id="broker-list">
+        <!-- Dynamically injected broker cards -->
+      </div>
 
-    <div class="broker-list" id="broker-list">
-      <!-- Broker cards rendered dynamically with preferred broker prioritization -->
-    </div>
-
-    <div class="tip-box">
-      <b>💡 How to Apply:</b><br>
-      • <b>📋 Copy Shares:</b> Tap the share quantity badge above to copy it to your clipboard.<br>
-      • <b>📱 In Kite App:</b> Once Kite opens, tap <b>Bids</b> (the 4th icon at the bottom) to view ongoing IPOs.<br>
-      • <b>🌐 On Web:</b> Tap <b>Web</b> to land directly on the broker's IPO bidding portal.
+      <div class="guidance-card">
+        <div class="guidance-step">
+          <div class="step-num">1</div>
+          <div class="step-text"><b>Copy share quantity</b> above matching your application category.</div>
+        </div>
+        <div class="guidance-step">
+          <div class="step-num">2</div>
+          <div class="step-text">Tap <b>App</b> on phone or <b>Web</b> in browser to enter the portal.</div>
+        </div>
+        <div class="guidance-step">
+          <div class="step-num">3</div>
+          <div class="step-text">Paste shares, input your UPI ID, and approve the mandate before 5:00 PM.</div>
+        </div>
+      </div>
     </div>
   </div>
 
-  <div id="copy-toast">Copied to clipboard!</div>
+  <div id="copy-toast" class="copy-toast" aria-live="polite">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="20 6 9 17 4 12"></polyline>
+    </svg>
+    <span id="toast-text">Copied shares to clipboard</span>
+  </div>
 
   <script>
     const isAndroid = /Android/i.test(navigator.userAgent);
@@ -339,8 +730,8 @@
       {
         id: 'zerodha',
         name: 'Zerodha Kite',
-        desc: 'App > Tap Bids (4th icon) | Web: Direct',
-        icon: '⚡',
+        desc: 'Bids tab (4th icon) > IPO section',
+        iconSvg: '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 12l10 10 10-10L12 2zm0 3.8L18.2 12 12 18.2 5.8 12 12 5.8z"/></svg>',
         iconBg: 'linear-gradient(135deg, #ea580c, #f97316)',
         androidIntent: 'intent://home#Intent;scheme=kite;package=com.zerodha.kite3;end',
         iosScheme: 'kite://home',
@@ -349,8 +740,8 @@
       {
         id: 'groww',
         name: 'Groww',
-        desc: 'Apply via UPI & Demat',
-        icon: '🟢',
+        desc: 'Instant UPI & Demat mandate',
+        iconSvg: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 14.5h-2A4.5 4.5 0 0 1 6.5 12 4.5 4.5 0 0 1 11 7.5h2v3h-2a1.5 1.5 0 0 0-1.5 1.5 1.5 1.5 0 0 0 1.5 1.5h2z"/></svg>',
         iconBg: 'linear-gradient(135deg, #059669, #10b981)',
         androidIntent: 'intent:#Intent;package=com.nextbillion.groww;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;S.browser_fallback_url=https%3A%2F%2Fgroww.in%2Fipo;end',
         iosScheme: 'groww://',
@@ -359,8 +750,8 @@
       {
         id: 'angelone',
         name: 'Angel One',
-        desc: 'Super App IPO Orders',
-        icon: '🔷',
+        desc: 'Super App order placement',
+        iconSvg: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 22 12 17 22 22 12 2"/></svg>',
         iconBg: 'linear-gradient(135deg, #2563eb, #3b82f6)',
         androidIntent: 'intent:#Intent;package=com.msf.angelmobile;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;S.browser_fallback_url=https%3A%2F%2Fwww.angelone.in%2Ftrade%2Fipo;end',
         iosScheme: 'angelone://',
@@ -369,8 +760,8 @@
       {
         id: 'upstox',
         name: 'Upstox',
-        desc: 'Instant IPO Application',
-        icon: '🟣',
+        desc: 'Pre-apply & live bids hub',
+        iconSvg: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>',
         iconBg: 'linear-gradient(135deg, #7c3aed, #8b5cf6)',
         androidIntent: 'intent://upstox.com/ipo#Intent;scheme=https;package=in.upstox.app;S.browser_fallback_url=https%3A%2F%2Fupstox.com%2Fipo-hub%2F;end',
         iosScheme: 'upstox://',
@@ -379,8 +770,8 @@
       {
         id: 'dhan',
         name: 'Dhan',
-        desc: 'Lightning Fast IPO Bid',
-        icon: '⚡',
+        desc: 'Lightning fast IPO bidding',
+        iconSvg: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
         iconBg: 'linear-gradient(135deg, #0d9488, #14b8a6)',
         androidIntent: 'intent:#Intent;package=com.dhan.live;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;S.browser_fallback_url=https%3A%2F%2Fdhan.co%2Fipo%2F;end',
         iosScheme: 'dhan://',
@@ -389,8 +780,8 @@
       {
         id: 'indmoney',
         name: 'INDmoney',
-        desc: 'Pre-apply & UPI Mandate',
-        icon: '🔵',
+        desc: 'Auto-mandate tracking',
+        iconSvg: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>',
         iconBg: 'linear-gradient(135deg, #0284c7, #38bdf8)',
         androidIntent: 'intent:#Intent;package=com.indwealth;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;S.browser_fallback_url=https%3A%2F%2Fwww.indmoney.com%2Fipo;end',
         iosScheme: 'indmoney://',
@@ -406,7 +797,6 @@
       const preferredId = localStorage.getItem('ipo_preferred_broker') || 'zerodha';
       const container = document.getElementById('broker-list');
 
-      // Sort preferred broker to the top
       const sorted = [...brokers].sort((a, b) => {
         if (a.id === preferredId) return -1;
         if (b.id === preferredId) return 1;
@@ -417,30 +807,50 @@
         const isPref = b.id === preferredId;
 
         return `
-          <div class="broker-card">
-            <a href="${b.webUrl}" target="_blank" rel="noopener noreferrer" class="broker-left" onclick="savePreferred('${b.id}')" title="Open ${b.name} Web Portal">
+          <div class="broker-card" onclick="handleCardClick('${b.id}', event)">
+            <div class="broker-top">
               <div class="broker-icon" style="background: ${b.iconBg};">
-                ${b.icon}
+                ${b.iconSvg}
               </div>
               <div class="broker-info">
-                <div class="broker-name">
-                  ${b.name}
+                <div class="broker-name-row">
+                  <span class="broker-name">${b.name}</span>
                   ${isPref ? '<span class="preferred-tag">Last Used</span>' : ''}
                 </div>
                 <div class="broker-desc">${b.desc}</div>
               </div>
-            </a>
+            </div>
             <div class="broker-actions">
-              <a href="${b.webUrl}" target="_blank" rel="noopener noreferrer" class="action-btn action-web" onclick="savePreferred('${b.id}')" title="Open ${b.name} in browser">
-                <span>🌐 Web</span>
-              </a>
               <button type="button" class="action-btn action-app" onclick="launchApp('${b.id}', event)" title="Launch ${b.name} mobile app">
-                <span>📱 App</span>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+                App
               </button>
+              <a href="${b.webUrl}" target="_blank" rel="noopener noreferrer" class="action-btn action-web" onclick="handleWebClick('${b.id}', event)" title="Open ${b.name} in browser">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                Web
+              </a>
             </div>
           </div>
         `;
       }).join('');
+    }
+
+    function handleCardClick(brokerId, event) {
+      if (event && event.target.closest('.broker-actions')) return;
+      savePreferred(brokerId);
+      if (isAndroid || isIOS) {
+        launchApp(brokerId);
+      } else {
+        const b = brokers.find(x => x.id === brokerId);
+        if (b) {
+          window.open(b.webUrl, '_blank', 'noopener,noreferrer');
+        }
+      }
+    }
+
+    function handleWebClick(brokerId, event) {
+      if (event) event.stopPropagation();
+      savePreferred(brokerId);
     }
 
     function launchApp(brokerId, event) {
@@ -451,7 +861,6 @@
 
       if (isAndroid) {
         if (b.id === 'zerodha') {
-          // Direct custom scheme intent with host 'home' matching Kite's MainActivity intent-filter
           window.location.href = 'intent://home#Intent;scheme=kite;package=com.zerodha.kite3;end';
           return;
         }
@@ -469,28 +878,50 @@
 
     function copyQty(qty, btn) {
       if (!qty) return;
-      navigator.clipboard.writeText(qty).then(() => {
-        showToast(`Copied ${qty} shares!`);
+      const cleanNum = qty.toString().trim();
+      const setCopiedState = () => {
+        showToast(`Copied ${cleanNum} shares to clipboard`);
         btn.classList.add('copied');
-        btn.innerHTML = `<span>${qty}</span> <span>✓</span>`;
+        btn.innerHTML = `
+          <span class="qty-num">${cleanNum}</span>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        `;
         setTimeout(() => {
           btn.classList.remove('copied');
-          btn.innerHTML = `<span>${qty}</span> <span>📋</span>`;
+          btn.innerHTML = `
+            <span class="qty-num">${cleanNum}</span>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+          `;
         }, 2000);
-      }).catch(() => {
-        const ta = document.createElement('textarea');
-        ta.value = qty;
-        document.body.appendChild(ta);
-        ta.select();
+      };
+
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(cleanNum).then(setCopiedState).catch(() => fallbackCopy(cleanNum, setCopiedState));
+      } else {
+        fallbackCopy(cleanNum, setCopiedState);
+      }
+    }
+
+    function fallbackCopy(text, callback) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try {
         document.execCommand('copy');
-        document.body.removeChild(ta);
-        showToast(`Copied ${qty} shares!`);
-      });
+        callback();
+      } catch (err) {
+        showToast('Failed to copy');
+      }
+      document.body.removeChild(ta);
     }
 
     function showToast(msg) {
       const t = document.getElementById('copy-toast');
-      t.textContent = msg;
+      const textEl = document.getElementById('toast-text');
+      if (textEl) textEl.textContent = msg;
       t.classList.add('show');
       setTimeout(() => t.classList.remove('show'), 2200);
     }
